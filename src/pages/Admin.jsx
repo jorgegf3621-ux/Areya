@@ -1783,9 +1783,24 @@ export default function Admin() {
       if (!mapped[keyCol]) { skipped++; lines.push(`⚠ Fila ${i+2}: sin ${keyCol}`); continue }
       try {
         if (type === 'master') {
-          const { data: ex } = await supabase.from('empleados').select('id').eq('id_colaborador', mapped.id_colaborador).single()
-          if (ex) { await updateEmpleado(ex.id, mapped); updated++; lines.push(`✓ Actualizado: ${mapped.id_colaborador}`) }
-          else { await supabase.from('empleados').insert(mapped); inserted++; lines.push(`+ Insertado: ${mapped.id_colaborador}`) }
+          const { data: ex, error: lookupError } = await supabase
+            .from('empleados')
+            .select('id')
+            .eq('id_colaborador', mapped.id_colaborador)
+            .maybeSingle()
+
+          if (lookupError) throw lookupError
+
+          if (ex) {
+            await updateEmpleado(ex.id, mapped)
+            updated++
+            lines.push(`✓ Actualizado: ${mapped.id_colaborador}`)
+          } else {
+            const { error: insertError } = await supabase.from('empleados').insert(mapped)
+            if (insertError) throw insertError
+            inserted++
+            lines.push(`+ Insertado: ${mapped.id_colaborador}`)
+          }
         } else {
           await upsertTemplate(mapped); inserted++; lines.push(`✓ Tarea: ${mapped.titulo} (${mapped.nivel})`)
         }
