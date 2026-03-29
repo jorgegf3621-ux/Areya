@@ -670,6 +670,17 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
 
 function ImportPage({ importTab, setImportTab, importData, setImportData, importLog, setImportLog, importing, onProcess, onRun, onDownloadTemplate }) {
   const [dragOver, setDragOver] = useState(false)
+  const previewRow = Array.isArray(importData?.rows)
+    ? importData.rows.find(row => row && typeof row === 'object' && !Array.isArray(row))
+    : null
+  const previewColumns = previewRow ? Object.keys(previewRow) : []
+
+  const renderPreviewValue = value => {
+    if (value == null) return ''
+    if (value instanceof Date) return value.toLocaleDateString('es-MX')
+    if (typeof value === 'object') return JSON.stringify(value)
+    return String(value)
+  }
 
   const handleDrop = event => {
     event.preventDefault()
@@ -728,7 +739,7 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="font-serif text-sm font-bold mb-3">{importData.fileName}</div>
           <div className="grid grid-cols-3 gap-3 mb-4">
-            {[{ n: importData.rows.length, l: 'Total filas' },{ n: Object.keys(importData.rows[0]).length, l: 'Columnas' },{ n: importData.type==='master'?'UPSERT':'Tareas', l: 'Modo' }].map((s,i) => (
+            {[{ n: importData.rows.length, l: 'Total filas' },{ n: previewColumns.length, l: 'Columnas' },{ n: importData.type==='master'?'UPSERT':'Tareas', l: 'Modo' }].map((s,i) => (
               <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
                 <div className="font-serif text-xl font-bold" style={{ color: ACCENT }}>{s.n}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{s.l}</div>
@@ -737,8 +748,18 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
           </div>
           <div className="overflow-x-auto rounded-lg border border-gray-100 mb-4">
             <table className="text-xs w-full border-collapse">
-              <thead><tr className="bg-gray-50">{Object.keys(importData.rows[0]).map(h => <th key={h} className="px-3 py-2 text-left font-bold text-gray-400 whitespace-nowrap border-b border-gray-100">{h}</th>)}</tr></thead>
-              <tbody>{importData.rows.slice(0,5).map((r,i) => <tr key={i} className="border-b border-gray-50">{Object.keys(importData.rows[0]).map(h => <td key={h} className="px-3 py-2 whitespace-nowrap max-w-32 truncate">{r[h]??''}</td>)}</tr>)}</tbody>
+              <thead>
+                <tr className="bg-gray-50">
+                  {previewColumns.map(h => <th key={h} className="px-3 py-2 text-left font-bold text-gray-400 whitespace-nowrap border-b border-gray-100">{h}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {importData.rows.slice(0,5).map((r,i) => (
+                  <tr key={i} className="border-b border-gray-50">
+                    {previewColumns.map(h => <td key={h} className="px-3 py-2 whitespace-nowrap max-w-32 truncate">{renderPreviewValue(r?.[h])}</td>)}
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
           <div className="flex gap-2 justify-end">
