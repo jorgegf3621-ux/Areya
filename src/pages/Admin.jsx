@@ -23,7 +23,7 @@ const MASTER_COL_MAP = {
   'id colaborador':'id_colaborador','idcolaborador':'id_colaborador','id de colaborador':'id_colaborador','id del colaborador':'id_colaborador',
   'numero de colaborador':'id_colaborador','no colaborador':'id_colaborador','num colaborador':'id_colaborador','colaborador id':'id_colaborador',
   'status':'status','uen':'uen','razon social':'razon_social',
-  'nombre':'nombre','apellido paterno':'ap_pat','ap. paterno':'ap_pat','apellido materno':'ap_mat','ap. materno':'ap_mat',
+  'nombre completo':'nombre_completo','nombre':'nombre','apellido paterno':'ap_pat','ap. paterno':'ap_pat','apellido materno':'ap_mat','ap. materno':'ap_mat',
   'fecha de nacimiento':'fecha_nac','fecha nacimiento':'fecha_nac','genero':'genero','género':'genero',
   'estado civil':'estado_civil','nacionalidad':'nacionalidad','rfc':'rfc','curp':'curp','nss':'nss',
   'direccion':'direccion','dirección':'direccion','municipio':'municipio',
@@ -1979,7 +1979,8 @@ export default function Admin() {
           const mappedMaster = mapRow(rows[i], MASTER_COL_MAP)
           const mappedTabulador = mapRow(rows[i], TABULADOR_COL_MAP)
           const hasMasterData = Object.keys(mappedMaster).some(key => MASTER_FIELDS.has(key) && key !== 'nivel_tab' && key !== 'familia_puesto')
-          const hasTabData = Object.keys(mappedTabulador).some(key => TABULADOR_FIELDS.has(key))
+          const TABULADOR_SPECIFIC = new Set(['referencia_comp', 'brinco', 'limite_inferior', 'limite_superior', 'rango'])
+          const hasTabData = Object.keys(mappedTabulador).some(key => TABULADOR_SPECIFIC.has(key))
 
           if (!hasMasterData && !hasTabData) {
             skipped++
@@ -2003,6 +2004,16 @@ export default function Admin() {
                 })
                 .filter(([, v]) => v !== null && v !== '')
             )
+            // Compute nombre_completo to avoid DB trigger duplication when "Nombre" column has full name
+            if (!masterPayload.nombre_completo) {
+              const n = String(masterPayload.nombre || '').trim()
+              const p = String(masterPayload.ap_pat || '').trim()
+              const m = String(masterPayload.ap_mat || '').trim()
+              if (n) {
+                const likelyFullName = p.length >= 4 && n.toLowerCase().includes(p.slice(0, 4).toLowerCase())
+                masterPayload.nombre_completo = likelyFullName ? n : [n, p, m].filter(Boolean).join(' ').trim()
+              }
+            }
             const { data: ex, error: lookupError } = await supabase
               .from('empleados')
               .select('id')
@@ -2035,6 +2046,7 @@ export default function Admin() {
                   if (['referencia_comp', 'limite_inferior', 'limite_superior'].includes(key)) return [key, parseMoneyLike(value)]
                   return [key, value]
                 })
+                .filter(([, v]) => v !== null && v !== '')
             )
 
             const { data: existingTab, error: tabLookupError } = await supabase
