@@ -528,7 +528,7 @@ function AttritionTab({ stats }) {
   return (
     <div>
       <div className="grid grid-cols-4 gap-3 mb-5">
-        <KpiCard label="Bajas este año" value={stats.bajasAnio} color="#EF4444" />
+        <KpiCard label={`Bajas ${new Date().getFullYear()}`} value={stats.bajasAnio} color="#EF4444" />
         <KpiCard label="Tasa de rotación" value={stats.tasaRot + '%'} color="#F59E0B" sub="Prom. industria: 8%" />
         <KpiCard label="Antigüedad prom. al salir" value={stats.avgAntigSalida + ' años'} color="#10B981" />
         <KpiCard label="Offboardings activos" value={stats.offboarding} color={ACCENT} />
@@ -540,7 +540,7 @@ function AttritionTab({ stats }) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <ChartCard title="Bajas por área"><div style={{ height: 180, position: 'relative' }}><canvas ref={bajasDeptRef} /></div></ChartCard>
+        <ChartCard title="Bajas por departamento"><div style={{ height: 180, position: 'relative' }}><canvas ref={bajasDeptRef} /></div></ChartCard>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="font-serif text-sm font-bold mb-3">Historial de bajas</div>
           {stats.inactivos_list.length === 0
@@ -1704,19 +1704,24 @@ export default function Admin() {
       { l: 'Seg. vida', v: Math.round(activos_ob.reduce((s,e)=>s+(e.seguro_vida||0),0)/costoTotal*100) },
     ].filter(d => d.v > 0) : []
 
-    // Attrition — use all registered bajas (not restricted to current year)
-    const bajasAnio = inactivos.length
-    const tasaRot = activos.length ? +((bajasAnio / (activos.length + bajasAnio)) * 100).toFixed(1) : 0
-    const antigSalidaVals = inactivos.filter(e => e.fecha_ingreso && e.fecha_termino)
+    // Attrition
+    const isValidDate = d => { if (!d) return false; const y = new Date(d).getFullYear(); return y > 1901 && y < 2100 }
+    const currentYear = new Date().getFullYear()
+    const bajasConFecha = inactivos.filter(e => isValidDate(e.fecha_termino))
+    const bajasAnio = bajasConFecha.filter(e => new Date(e.fecha_termino).getFullYear() === currentYear).length
+    const totalBajas = inactivos.length
+    const tasaRot = activos.length ? +((totalBajas / (activos.length + totalBajas)) * 100).toFixed(1) : 0
+    const antigSalidaVals = bajasConFecha.filter(e => isValidDate(e.fecha_ingreso))
       .map(e => (new Date(e.fecha_termino) - new Date(e.fecha_ingreso)) / (1000*60*60*24*365.25))
     const avgAntigSalida = antigSalidaVals.length
       ? +(antigSalidaVals.reduce((a,b)=>a+b,0)/antigSalidaVals.length).toFixed(1) : 0
 
-    const motivoMap = countBy(inactivos, 'razon_termino')
+    const motivoMap = countBy(inactivos.filter(e => e.razon_termino), 'razon_termino')
     const bajasMes = Array(12).fill(0)
-    inactivos.filter(e => e.fecha_termino && new Date(e.fecha_termino).getFullYear() > 1901)
+    bajasConFecha.filter(e => new Date(e.fecha_termino).getFullYear() === currentYear)
       .forEach(e => bajasMes[new Date(e.fecha_termino).getMonth()]++)
-    const bajasDeptMap = countBy(inactivos.filter(e => e.departamento), 'departamento')
+    const isValidDept = v => v && typeof v === 'string' && !v.includes('1900') && !v.includes('1899') && v.trim() !== ''
+    const bajasDeptMap = countBy(inactivos.filter(e => isValidDept(e.departamento)), 'departamento')
 
     return {
       headcount: activos.length, onboarding: onboarding.length, offboarding: offboarding.length, total,
