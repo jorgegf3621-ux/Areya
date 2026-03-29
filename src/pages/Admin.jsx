@@ -35,11 +35,22 @@ const MASTER_COL_MAP = {
   'fecha termino':'fecha_termino','razon de termino':'razon_termino',
   'antiguedad':'antiguedad','antigüedad':'antiguedad',
   'familia de puesto':'familia_puesto','nivel tab':'nivel_tab','nivel':'nivel_tab',
-  'gente a cargo':'gente_a_cargo','sueldo bruto':'sueldo_bruto','sueldo neto':'sueldo_neto',
-  'gasolina':'gasolina','despensa':'despensa','fondo de ahorro':'fondo_ahorro',
-  'meses bono':'meses_bono','% prima':'pct_prima','prima vacacional':'prima_vacacional',
-  'mant. auto':'mant_auto','monto celular':'monto_celular','celular':'celular',
+  'gente a cargo':'gente_a_cargo',
+  'sueldo bruto':'sueldo_bruto','sueldo bruto mensual':'sueldo_bruto','sueldo mensual bruto':'sueldo_bruto',
+  'sueldo neto':'sueldo_neto','sueldo neto mensual':'sueldo_neto',
+  'gasolina':'gasolina',
+  'despensa':'despensa','despensa 12%':'despensa','despensa 12 %':'despensa',
+  'fondo de ahorro':'fondo_ahorro','fondo ahorro':'fondo_ahorro',
+  'meses bono':'meses_bono','meses de bono':'meses_bono',
+  '% prima':'pct_prima','pct prima':'pct_prima','porcentaje prima vacacional':'pct_prima','porcentaje prima vacacional 2026':'pct_prima',
+  'prima vacacional':'prima_vacacional','prima vacacional 2026':'prima_vacacional',
+  'mant. auto':'mant_auto','mantenimiento':'mant_auto','mantenimiento auto':'mant_auto','mant auto':'mant_auto',
+  'monto celular':'monto_celular','celular':'celular',
   'sgmm':'sgmm','seguro de vida':'seguro_vida','comentarios':'comentarios',
+  'rango sueldo':'rango_sueldo','rango de sueldo':'rango_sueldo',
+  'punto medio':'punto_medio',
+  'diferencia en %':'dif_pct','diferencia %':'dif_pct','diferencia en porcentaje':'dif_pct','diferencia pct':'dif_pct',
+  'diferencia $':'dif_pesos','diferencia pesos':'dif_pesos','diferencia en pesos':'dif_pesos','diferencia en $':'dif_pesos',
   'costo real mensual':'costo_real_mens','costo real anual':'costo_real_anual',
   'costo real anual 2026':'costo_real_anual',
 }
@@ -118,7 +129,7 @@ function normalizeKey(k) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[.#/\\_-]+/g, ' ')
+    .replace(/[.#/\\_\-()\[\]{}]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
