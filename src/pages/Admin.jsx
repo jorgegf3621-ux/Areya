@@ -34,7 +34,8 @@ const MASTER_COL_MAP = {
   'email corporativo':'email_corporativo','correo corporativo':'email_corporativo',
   'fecha termino':'fecha_termino','razon de termino':'razon_termino',
   'antiguedad':'antiguedad','antigüedad':'antiguedad',
-  'familia de puesto':'familia_puesto','nivel tab':'nivel_tab','nivel':'nivel_tab',
+  'familia de puesto':'familia_puesto','familia puesto':'familia_puesto','familia':'familia_puesto',
+  'nivel tab':'nivel_tab','nivel':'nivel_tab','nivel tabulador':'nivel_tab',
   'gente a cargo':'gente_a_cargo',
   'sueldo bruto':'sueldo_bruto','sueldo bruto mensual':'sueldo_bruto','sueldo mensual bruto':'sueldo_bruto',
   'sueldo neto':'sueldo_neto','sueldo neto mensual':'sueldo_neto',
@@ -46,7 +47,8 @@ const MASTER_COL_MAP = {
   'prima vacacional':'prima_vacacional','prima vacacional 2026':'prima_vacacional',
   'mant. auto':'mant_auto','mantenimiento':'mant_auto','mantenimiento auto':'mant_auto','mant auto':'mant_auto',
   'monto celular':'monto_celular','celular':'celular',
-  'sgmm':'sgmm','seguro de vida':'seguro_vida','comentarios':'comentarios',
+  'sgmm':'sgmm','gastos medicos':'sgmm','gastos medicos mayores':'sgmm','gmm':'sgmm','seguro gastos medicos':'sgmm',
+  'seguro de vida':'seguro_vida','vida':'seguro_vida','comentarios':'comentarios',
   'rango sueldo':'rango_sueldo','rango de sueldo':'rango_sueldo',
   'punto medio':'punto_medio',
   'diferencia en %':'dif_pct','diferencia %':'dif_pct','diferencia en porcentaje':'dif_pct','diferencia pct':'dif_pct',
@@ -60,13 +62,17 @@ const TAREAS_COL_MAP = {
   'titulo':'titulo','título':'titulo','descripcion':'descripcion','descripción':'descripcion','orden':'orden',
 }
 
+const REF_COL = 'Referencia objetivo (80%)'
+const LIM_INF_COL = 'Límite inferior de banda'
+const LIM_SUP_COL = 'Límite superior de banda (120%)'
+
 const TABULADOR_COL_MAP = {
   'familia de puesto':'familia_puesto','familia puesto':'familia_puesto','familia':'familia_puesto',
   'nivel':'nivel',
-  'referencia c':'referencia_comp','referencia comp':'referencia_comp','referencia':'referencia_comp',
+  'referencia c':REF_COL,'referencia comp':REF_COL,'referencia':REF_COL,'referencia objetivo':REF_COL,'referencia objetivo 80':REF_COL,
   'brinco':'brinco','brinco %':'brinco','porcentaje brinco':'brinco',
-  'limite inferior':'limite_inferior','limite inf':'limite_inferior','limite inferi':'limite_inferior','limite inferior $':'limite_inferior',
-  'limite superior':'limite_superior','limite sup':'limite_superior','limite super':'limite_superior','limite superior $':'limite_superior',
+  'limite inferior':LIM_INF_COL,'limite inf':LIM_INF_COL,'limite inferi':LIM_INF_COL,'limite inferior $':LIM_INF_COL,'limite inferior de banda':LIM_INF_COL,
+  'limite superior':LIM_SUP_COL,'limite sup':LIM_SUP_COL,'limite super':LIM_SUP_COL,'limite superior $':LIM_SUP_COL,'limite superior de banda':LIM_SUP_COL,'limite superior de banda 120':LIM_SUP_COL,
   'rango':'rango',
 }
 
@@ -1428,9 +1434,9 @@ function TabuladorPage() {
         rows: (rows.length ? rows : TABULADOR.map(item => ({
           nivel: item.n,
           familia_puesto: item.f,
-          referencia_comp: item.ref,
-          limite_inferior: item.inf,
-          limite_superior: item.sup,
+          [REF_COL]: item.ref,
+          [LIM_INF_COL]: item.inf,
+          [LIM_SUP_COL]: item.sup,
         }))),
       },
     ])
@@ -1458,19 +1464,19 @@ function TabuladorPage() {
             {(rows.length ? rows : TABULADOR.map(item => ({
               familia_puesto: item.f,
               nivel: item.n,
-              referencia_comp: item.ref,
+              [REF_COL]: item.ref,
               brinco: item.b,
-              limite_inferior: item.inf,
-              limite_superior: item.sup,
+              [LIM_INF_COL]: item.inf,
+              [LIM_SUP_COL]: item.sup,
               rango: `${item.inf} - ${item.sup}`,
             }))).map((row, index) => (
               <tr key={row.id || row.nivel || index} className="border-b border-gray-50">
                 <td className="px-3 py-2">{row.familia_puesto || row.f || '—'}</td>
                 <td className="px-3 py-2">{row.nivel ?? row.n ?? '—'}</td>
-                <td className="px-3 py-2">{fmt(row.referencia_comp ?? row.ref)}</td>
-                <td className="px-3 py-2">{row.brinco != null && row.brinco !== '' ? `${row.brinco}%` : '—'}</td>
-                <td className="px-3 py-2">{fmt(row.limite_inferior ?? row.inf)}</td>
-                <td className="px-3 py-2">{fmt(row.limite_superior ?? row.sup)}</td>
+                <td className="px-3 py-2">{fmt(row[REF_COL] ?? row.ref)}</td>
+                <td className="px-3 py-2">{row.brinco != null && row.brinco !== '' ? `${Math.round(Number(row.brinco))}%` : '—'}</td>
+                <td className="px-3 py-2">{fmt(row[LIM_INF_COL] ?? row.inf)}</td>
+                <td className="px-3 py-2">{fmt(row[LIM_SUP_COL] ?? row.sup)}</td>
                 <td className="px-3 py-2">{row.rango || '—'}</td>
               </tr>
             ))}
@@ -1990,7 +1996,7 @@ export default function Admin() {
           const mappedMaster = mapRow(rows[i], MASTER_COL_MAP)
           const mappedTabulador = mapRow(rows[i], TABULADOR_COL_MAP)
           const hasMasterData = Object.keys(mappedMaster).some(key => MASTER_FIELDS.has(key) && key !== 'nivel_tab' && key !== 'familia_puesto')
-          const TABULADOR_SPECIFIC = new Set(['referencia_comp', 'brinco', 'limite_inferior', 'limite_superior', 'rango'])
+          const TABULADOR_SPECIFIC = new Set([REF_COL, 'brinco', LIM_INF_COL, LIM_SUP_COL, 'rango'])
           const hasTabData = Object.keys(mappedTabulador).some(key => TABULADOR_SPECIFIC.has(key))
 
           if (!hasMasterData && !hasTabData) {
@@ -2046,7 +2052,7 @@ export default function Admin() {
                 .map(([key, value]) => {
                   if (key === 'nivel') { const n = Number(String(value).replace(/[^\d.-]/g, '')); return [key, Number.isFinite(n) ? n : null] }
                   if (key === 'brinco') return [key, parsePercentLike(value)]
-                  if (['referencia_comp', 'limite_inferior', 'limite_superior'].includes(key)) return [key, parseMoneyLike(value)]
+                  if ([REF_COL, LIM_INF_COL, LIM_SUP_COL].includes(key)) return [key, parseMoneyLike(value)]
                   return [key, value]
                 })
                 .filter(([, v]) => v !== null && v !== '')
