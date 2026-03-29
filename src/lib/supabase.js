@@ -95,13 +95,12 @@ export async function updateEmpleado(id, fields) {
 }
 
 export async function createEmpleadoDesdeFormulario(form) {
-  const { cargo, tipo_contrato, id_colaborador, ...rest } = form
+  const { cargo, tipo_contrato, id_colaborador, nombre_completo: _nc, ...rest } = form
   const payload = {
     ...rest,
     ...(cargo !== undefined && { 'Puesto': cargo }),
     ...(tipo_contrato !== undefined && { 'Tipo de contratación': tipo_contrato }),
     ...(id_colaborador !== undefined && { 'ID Colaborador': id_colaborador }),
-    nombre_completo: buildNombreCompleto(form),
     status: 'Pendiente',
     onboarding_configurado: false,
     email_corporativo: null,

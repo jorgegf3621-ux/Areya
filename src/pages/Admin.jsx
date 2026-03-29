@@ -2004,16 +2004,8 @@ export default function Admin() {
                 })
                 .filter(([, v]) => v !== null && v !== '')
             )
-            // Compute nombre_completo to avoid DB trigger duplication when "Nombre" column has full name
-            if (!masterPayload.nombre_completo) {
-              const n = String(masterPayload.nombre || '').trim()
-              const p = String(masterPayload.ap_pat || '').trim()
-              const m = String(masterPayload.ap_mat || '').trim()
-              if (n) {
-                const likelyFullName = p.length >= 4 && n.toLowerCase().includes(p.slice(0, 4).toLowerCase())
-                masterPayload.nombre_completo = likelyFullName ? n : [n, p, m].filter(Boolean).join(' ').trim()
-              }
-            }
+            // nombre_completo is a generated column — remove it so DB computes it automatically
+            delete masterPayload.nombre_completo
             const { data: ex, error: lookupError } = await supabase
               .from('empleados')
               .select('id')
