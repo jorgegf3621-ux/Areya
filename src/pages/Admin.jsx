@@ -6,7 +6,9 @@ import {
   configurarNuevoIngreso,
   getEmpleados,
   getEntrevistasSalidaPendientes,
+  getTabuladorRows,
   updateEmpleado,
+  upsertTabuladorRow,
   upsertTemplate,
 } from '../lib/supabase'
 import { TABULADOR, calcCompensacion } from '../lib/tabulador'
@@ -18,7 +20,9 @@ const ADMIN_SESSION_KEY = 'areya_admin_session'
 // Constants
 
 const MASTER_COL_MAP = {
-  'id colaborador':'id_colaborador','status':'status','uen':'uen','razon social':'razon_social',
+  'id colaborador':'id_colaborador','idcolaborador':'id_colaborador','id de colaborador':'id_colaborador','id del colaborador':'id_colaborador',
+  'numero de colaborador':'id_colaborador','no colaborador':'id_colaborador','num colaborador':'id_colaborador','colaborador id':'id_colaborador',
+  'status':'status','uen':'uen','razon social':'razon_social',
   'nombre':'nombre','apellido paterno':'ap_pat','ap. paterno':'ap_pat','apellido materno':'ap_mat','ap. materno':'ap_mat',
   'fecha de nacimiento':'fecha_nac','fecha nacimiento':'fecha_nac','genero':'genero','género':'genero',
   'estado civil':'estado_civil','nacionalidad':'nacionalidad','rfc':'rfc','curp':'curp','nss':'nss',
@@ -43,6 +47,16 @@ const MASTER_COL_MAP = {
 const TAREAS_COL_MAP = {
   'nivel':'nivel','categoria':'categoria','categoría':'categoria',
   'titulo':'titulo','título':'titulo','descripcion':'descripcion','descripción':'descripcion','orden':'orden',
+}
+
+const TABULADOR_COL_MAP = {
+  'familia de puesto':'familia_puesto','familia puesto':'familia_puesto','familia':'familia_puesto',
+  'nivel':'nivel',
+  'referencia c':'referencia_comp','referencia comp':'referencia_comp','referencia':'referencia_comp',
+  'brinco':'brinco','brinco %':'brinco','porcentaje brinco':'brinco',
+  'limite inferior':'limite_inferior','limite inf':'limite_inferior','limite inferior $':'limite_inferior',
+  'limite superior':'limite_superior','limite sup':'limite_superior','limite superior $':'limite_superior',
+  'rango':'rango',
 }
 
 const STATUS_CLS = {
@@ -98,12 +112,64 @@ const OFFBOARDING_REASON_TYPES = {
 
 // Utilities
 
-function normalizeKey(k) { return k.toString().toLowerCase().trim().replace(/\s+/g,' ') }
+function normalizeKey(k) {
+  return k
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[.#/\\_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
 function mapRow(row, colMap) {
   const out = {}
   Object.entries(row).forEach(([k,v]) => { const db = colMap[normalizeKey(k)]; if (db) out[db] = v==='' ? null : v })
   return out
 }
+
+function findHeaderRowIndex(matrix, type) {
+  const expected = type === 'master'
+    ? ['id colaborador', 'nombre', 'nombre completo', 'rfc', 'email corporativo', 'nivel', 'familia de puesto', 'referencia c']
+    : ['nivel', 'categoria', 'titulo', 'descripcion', 'orden']
+
+  let bestIndex = 0
+  let bestScore = -1
+
+  for (let i = 0; i < Math.min(matrix.length, 10); i++) {
+    const row = (matrix[i] || []).map(cell => normalizeKey(cell))
+    const score = expected.reduce((total, key) => total + (row.includes(key) ? 1 : 0), 0)
+    if (score > bestScore) {
+      bestScore = score
+      bestIndex = i
+    }
+  }
+
+  return bestIndex
+}
+
+function buildRowsFromMatrix(matrix, headerRowIndex) {
+  const headers = (matrix[headerRowIndex] || []).map(cell => String(cell ?? '').trim())
+  const rows = []
+
+  for (let i = headerRowIndex + 1; i < matrix.length; i++) {
+    const row = matrix[i] || []
+    const hasContent = row.some(cell => String(cell ?? '').trim() !== '')
+    if (!hasContent) continue
+
+    const obj = {}
+    headers.forEach((header, colIndex) => {
+      if (!header) return
+      obj[header] = row[colIndex] ?? ''
+    })
+    rows.push(obj)
+  }
+
+  return rows
+}
+
+const TABULADOR_FIELDS = new Set(Object.values(TABULADOR_COL_MAP))
+const MASTER_FIELDS = new Set(Object.values(MASTER_COL_MAP))
 const fmt = n => n != null ? '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'
 const fmtDate = d => { if(!d) return '—'; try { return new Date(d+'T12:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) } catch { return d } }
 const yrsDiff = d => d ? (Date.now()-new Date(d).getTime())/(1000*60*60*24*365.25) : 0
@@ -696,7 +762,7 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
           <button key={t} onClick={() => { setImportTab(t); setImportData(null); setImportLog(null) }}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${importTab === t ? 'bg-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
             style={importTab === t ? { color: BRAND } : {}}>
-            {t === 'master' ? 'Master de empleados' : 'Plantilla de tareas'}
+            {t === 'master' ? 'Master / Tabulador' : 'Plantilla de tareas'}
           </button>
         ))}
       </div>
@@ -704,9 +770,10 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
       <div className={`bg-white rounded-xl shadow-sm p-4 mb-4 border-l-4 ${importTab === 'master' ? 'border-indigo-500' : 'border-purple-500'}`}>
         {importTab === 'master' ? (
           <div className="text-sm text-gray-600">
-            <strong className="text-gray-800">Columna requerida:</strong>{' '}
-            <code className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-xs">ID Colaborador</code>
-            <span className="text-xs text-gray-500 block mt-1">Carga completa o actualización parcial. Celdas vacías → null.</span>
+            <strong className="text-gray-800">Importación selectiva:</strong>{' '}
+            <code className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-xs">ID Colaborador</code> para master y/o{' '}
+            <code className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-xs">Nivel</code> para tabulador.
+            <span className="text-xs text-gray-500 block mt-1">Solo actualiza los campos presentes en el archivo. Los vacíos no borran información.</span>
           </div>
         ) : (
           <div className="text-sm text-gray-600">
@@ -776,8 +843,8 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
       {importLog && (
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="font-serif text-sm font-bold mb-3">Resultado</div>
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            {[{ n: importLog.inserted, l: 'Insertados', c: ACCENT },{ n: importLog.updated, l: 'Actualizados', c: '#10B981' },{ n: importLog.skipped, l: 'Omitidos', c: importLog.skipped ? '#EF4444' : '#9CA3AF' }].map((s,i) => (
+          <div className="grid grid-cols-5 gap-3 mb-4">
+            {[{ n: importLog.inserted, l: 'Master nuevos', c: ACCENT },{ n: importLog.updated, l: 'Master actualizados', c: '#10B981' },{ n: importLog.tabInserted || 0, l: 'Tabulador nuevos', c: '#7C3AED' },{ n: importLog.tabUpdated || 0, l: 'Tabulador actualizados', c: '#0891B2' },{ n: importLog.skipped, l: 'Omitidos', c: importLog.skipped ? '#EF4444' : '#9CA3AF' }].map((s,i) => (
               <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
                 <div className="font-serif text-2xl font-bold" style={{ color: s.c }}>{s.n}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{s.l}</div>
@@ -1250,29 +1317,79 @@ function OffboardingPageAdmin({ entrevistas, onComplete }) {
   )
 }
 function TabuladorPage() {
+  const [rows, setRows] = useState([])
+  const [loadErr, setLoadErr] = useState('')
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const data = await getTabuladorRows()
+        setRows(data || [])
+        setLoadErr('')
+      } catch {
+        setRows([])
+        setLoadErr('Aún no se ha cargado el tabulador desde Supabase.')
+      }
+    }
+    load()
+  }, [])
+
   const exportTabulador = () => {
     exportWorkbook('tabulador_puestos.xlsx', [
       {
         name: 'Tabulador',
-        rows: TABULADOR.map(item => ({
+        rows: (rows.length ? rows : TABULADOR.map(item => ({
           nivel: item.n,
-          familia: item.f,
-          referencia: item.ref,
-        })),
+          familia_puesto: item.f,
+          referencia_comp: item.ref,
+          limite_inferior: item.inf,
+          limite_superior: item.sup,
+        }))),
       },
     ])
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm p-6 max-w-lg text-gray-500 text-sm">
+    <div className="bg-white rounded-xl shadow-sm p-6 text-gray-500 text-sm">
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="font-serif text-base font-bold text-gray-800">Tabulador actual</div>
         <button onClick={exportTabulador} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">
           Descargar Excel
         </button>
       </div>
-      Módulo de tabulador - conecta con la tabla <code className="bg-gray-100 px-1.5 rounded text-xs">tabulador</code> en Supabase.<br />
-      Importa tu tabulador desde <span className="font-semibold text-gray-700">Importar datos</span>.
+      {loadErr && <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-amber-800">{loadErr}</div>}
+      <div className="overflow-x-auto rounded-lg border border-gray-100">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-gray-50">
+              {['Familia de puesto', 'Nivel', 'Referencia', 'Brinco', 'Límite inferior', 'Límite superior', 'Rango'].map(h => (
+                <th key={h} className="px-3 py-2 text-left font-bold text-gray-400 whitespace-nowrap border-b border-gray-100">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {(rows.length ? rows : TABULADOR.map(item => ({
+              familia_puesto: item.f,
+              nivel: item.n,
+              referencia_comp: item.ref,
+              brinco: null,
+              limite_inferior: item.inf,
+              limite_superior: item.sup,
+              rango: `${item.inf} - ${item.sup}`,
+            }))).map((row, index) => (
+              <tr key={row.id || row.nivel || index} className="border-b border-gray-50">
+                <td className="px-3 py-2">{row.familia_puesto || row.f || '—'}</td>
+                <td className="px-3 py-2">{row.nivel ?? row.n ?? '—'}</td>
+                <td className="px-3 py-2">{fmt(row.referencia_comp ?? row.ref)}</td>
+                <td className="px-3 py-2">{row.brinco != null && row.brinco !== '' ? `${row.brinco}%` : '—'}</td>
+                <td className="px-3 py-2">{fmt(row.limite_inferior ?? row.inf)}</td>
+                <td className="px-3 py-2">{fmt(row.limite_superior ?? row.sup)}</td>
+                <td className="px-3 py-2">{row.rango || '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -1756,7 +1873,9 @@ export default function Admin() {
           showToast('El archivo no contiene una hoja válida.')
           return
         }
-        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+        const headerRowIndex = findHeaderRowIndex(matrix, type)
+        const rows = buildRowsFromMatrix(matrix, headerRowIndex)
         if (!rows.length) {
           showToast('⚠ El archivo está vacío')
           return
@@ -1777,38 +1896,81 @@ export default function Admin() {
     const { rows, type } = importData
     const colMap = type === 'master' ? MASTER_COL_MAP : TAREAS_COL_MAP
     let inserted = 0, updated = 0, skipped = 0, lines = []
+    let tabInserted = 0, tabUpdated = 0
     for (let i = 0; i < rows.length; i++) {
-      const mapped = mapRow(rows[i], colMap)
-      const keyCol = type === 'master' ? 'id_colaborador' : 'titulo'
-      if (!mapped[keyCol]) { skipped++; lines.push(`⚠ Fila ${i+2}: sin ${keyCol}`); continue }
       try {
         if (type === 'master') {
-          const { data: ex, error: lookupError } = await supabase
-            .from('empleados')
-            .select('id')
-            .eq('id_colaborador', mapped.id_colaborador)
-            .maybeSingle()
+          const mappedMaster = mapRow(rows[i], MASTER_COL_MAP)
+          const mappedTabulador = mapRow(rows[i], TABULADOR_COL_MAP)
+          const hasMasterData = Object.keys(mappedMaster).some(key => MASTER_FIELDS.has(key))
+          const hasTabData = Object.keys(mappedTabulador).some(key => TABULADOR_FIELDS.has(key))
 
-          if (lookupError) throw lookupError
+          if (!hasMasterData && !hasTabData) {
+            skipped++
+            lines.push(`⚠ Fila ${i+2}: sin columnas reconocidas para master o tabulador`)
+            continue
+          }
 
-          if (ex) {
-            await updateEmpleado(ex.id, mapped)
-            updated++
-            lines.push(`✓ Actualizado: ${mapped.id_colaborador}`)
-          } else {
-            const { error: insertError } = await supabase.from('empleados').insert(mapped)
-            if (insertError) throw insertError
-            inserted++
-            lines.push(`+ Insertado: ${mapped.id_colaborador}`)
+          if (hasMasterData && mappedMaster.id_colaborador) {
+            const masterPayload = Object.fromEntries(Object.entries(mappedMaster).filter(([, value]) => value !== '' && value != null))
+            const { data: ex, error: lookupError } = await supabase
+              .from('empleados')
+              .select('id')
+              .eq('id_colaborador', mappedMaster.id_colaborador)
+              .maybeSingle()
+
+            if (lookupError) throw lookupError
+
+            if (ex) {
+              await updateEmpleado(ex.id, masterPayload)
+              updated++
+              lines.push(`✓ Master actualizado: ${mappedMaster.id_colaborador}`)
+            } else {
+              const { error: insertError } = await supabase.from('empleados').insert(masterPayload)
+              if (insertError) throw insertError
+              inserted++
+              lines.push(`+ Master insertado: ${mappedMaster.id_colaborador}`)
+            }
+          } else if (hasMasterData) {
+            lines.push(`⚠ Fila ${i+2}: columnas de master detectadas pero falta id_colaborador`)
+          }
+
+          if (hasTabData && mappedTabulador.nivel !== '' && mappedTabulador.nivel != null) {
+            const tabPayload = Object.fromEntries(
+              Object.entries(mappedTabulador)
+                .filter(([, value]) => value !== '' && value != null)
+                .map(([key, value]) => [key, ['nivel', 'referencia_comp', 'brinco', 'limite_inferior', 'limite_superior'].includes(key) ? Number(String(value).replace(/[%,$\s,]/g, '')) : value])
+            )
+
+            const { data: existingTab, error: tabLookupError } = await supabase
+              .from('tabulador')
+              .select('id, nivel')
+              .eq('nivel', tabPayload.nivel)
+              .maybeSingle()
+            if (tabLookupError) throw tabLookupError
+
+            await upsertTabuladorRow(tabPayload)
+            if (existingTab) {
+              tabUpdated++
+              lines.push(`✓ Tabulador actualizado: nivel ${tabPayload.nivel}`)
+            } else {
+              tabInserted++
+              lines.push(`+ Tabulador insertado: nivel ${tabPayload.nivel}`)
+            }
+          } else if (hasTabData) {
+            lines.push(`⚠ Fila ${i+2}: columnas de tabulador detectadas pero falta nivel`)
           }
         } else {
+          const mapped = mapRow(rows[i], colMap)
+          const keyCol = 'titulo'
+          if (!mapped[keyCol]) { skipped++; lines.push(`⚠ Fila ${i+2}: sin ${keyCol}`); continue }
           await upsertTemplate(mapped); inserted++; lines.push(`✓ Tarea: ${mapped.titulo} (${mapped.nivel})`)
         }
       } catch (err) { skipped++; lines.push(`✕ Fila ${i+2}: ${err.message?.slice(0,60)}`) }
     }
-    setImportLog({ inserted, updated, skipped, lines })
+    setImportLog({ inserted, updated, skipped, lines, tabInserted, tabUpdated })
     setImporting(false)
-    showToast(`✓ Importación completa - ${inserted} nuevos · ${updated} actualizados`)
+    showToast(`✓ Importación completa - master: ${inserted} nuevos · ${updated} actualizados · tabulador: ${tabInserted} nuevos · ${tabUpdated} actualizados`)
     if (type === 'master') loadEmpleados()
   }
 

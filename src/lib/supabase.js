@@ -203,6 +203,26 @@ export async function upsertTemplate(row) {
   return data
 }
 
+// TABULADOR
+
+export async function getTabuladorRows() {
+  const { data, error } = await supabase
+    .from('tabulador')
+    .select('*')
+    .order('nivel')
+  if (error) throw error
+  return data
+}
+
+export async function upsertTabuladorRow(row) {
+  const { data, error } = await supabase
+    .from('tabulador')
+    .upsert(row, { onConflict: 'nivel', ignoreDuplicates: false })
+    .select()
+  if (error) throw error
+  return data
+}
+
 // ACCESS REQUESTS
 
 export async function getAccessRequests() {
