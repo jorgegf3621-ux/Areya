@@ -54,8 +54,8 @@ const TABULADOR_COL_MAP = {
   'nivel':'nivel',
   'referencia c':'referencia_comp','referencia comp':'referencia_comp','referencia':'referencia_comp',
   'brinco':'brinco','brinco %':'brinco','porcentaje brinco':'brinco',
-  'limite inferior':'limite_inferior','limite inf':'limite_inferior','limite inferior $':'limite_inferior',
-  'limite superior':'limite_superior','limite sup':'limite_superior','limite superior $':'limite_superior',
+  'limite inferior':'limite_inferior','limite inf':'limite_inferior','limite inferi':'limite_inferior','limite inferior $':'limite_inferior',
+  'limite superior':'limite_superior','limite sup':'limite_superior','limite super':'limite_superior','limite superior $':'limite_superior',
   'rango':'rango',
 }
 
@@ -166,6 +166,25 @@ function buildRowsFromMatrix(matrix, headerRowIndex) {
   }
 
   return rows
+}
+
+function parseMoneyLike(value) {
+  if (value == null || value === '') return null
+  const cleaned = String(value).replace(/[$,\s]/g, '').trim()
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function parsePercentLike(value) {
+  if (value == null || value === '') return null
+  const raw = String(value).trim()
+  if (raw.includes('%')) {
+    const parsed = Number(raw.replace(/[%\s,]/g, ''))
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  const parsed = Number(raw.replace(/[\s,]/g, ''))
+  if (!Number.isFinite(parsed)) return null
+  return parsed <= 1 ? parsed * 100 : parsed
 }
 
 const TABULADOR_FIELDS = new Set(Object.values(TABULADOR_COL_MAP))
@@ -1929,7 +1948,7 @@ export default function Admin() {
         if (type === 'master') {
           const mappedMaster = mapRow(rows[i], MASTER_COL_MAP)
           const mappedTabulador = mapRow(rows[i], TABULADOR_COL_MAP)
-          const hasMasterData = Object.keys(mappedMaster).some(key => MASTER_FIELDS.has(key))
+          const hasMasterData = Object.keys(mappedMaster).some(key => MASTER_FIELDS.has(key) && key !== 'nivel_tab' && key !== 'familia_puesto')
           const hasTabData = Object.keys(mappedTabulador).some(key => TABULADOR_FIELDS.has(key))
 
           if (!hasMasterData && !hasTabData) {
@@ -1966,7 +1985,12 @@ export default function Admin() {
             const tabPayload = Object.fromEntries(
               Object.entries(mappedTabulador)
                 .filter(([, value]) => value !== '' && value != null)
-                .map(([key, value]) => [key, ['nivel', 'referencia_comp', 'brinco', 'limite_inferior', 'limite_superior'].includes(key) ? Number(String(value).replace(/[%,$\s,]/g, '')) : value])
+                .map(([key, value]) => {
+                  if (key === 'nivel') return [key, Number(String(value).replace(/[^\d.-]/g, ''))]
+                  if (key === 'brinco') return [key, parsePercentLike(value)]
+                  if (['referencia_comp', 'limite_inferior', 'limite_superior'].includes(key)) return [key, parseMoneyLike(value)]
+                  return [key, value]
+                })
             )
 
             const { data: existingTab, error: tabLookupError } = await supabase
