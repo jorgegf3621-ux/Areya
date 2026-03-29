@@ -34,6 +34,21 @@ export default function Salida() {
     setLoading(true)
     try {
       await insertEntrevistaSalida(empleado.id, { ...form, completado: true })
+      try {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'notify_rrhh_offboarding',
+            data: {
+              nombre: empleado.nombre_completo,
+              cargo: empleado.cargo,
+              departamento: empleado.departamento,
+              motivo_salida: form.motivo_salida,
+            },
+          }),
+        })
+      } catch {}
       setDone(true)
     } catch (e) {
       setError('Error al enviar. Intenta de nuevo.')

@@ -1,33 +1,33 @@
-import { useState, useEffect, useRef } from 'react'
-import { supabase, getEmpleados, updateEmpleado, getAccessRequests, approveAccess, upsertEmpleado, upsertTemplate } from '../lib/supabase'
+﻿import { useState, useEffect, useRef, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import {
+  supabase,
+  completeOffboarding,
+  configurarNuevoIngreso,
+  getEmpleados,
+  getEntrevistasSalidaPendientes,
+  updateEmpleado,
+  upsertTemplate,
+} from '../lib/supabase'
+import { TABULADOR, calcCompensacion } from '../lib/tabulador'
+import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
-const ADMIN_USERS = [
-  { email: 'estefania.saldivar@areya.com.mx', pass: 'Chapis123', name: 'Estefanía Saldívar', rol: 'Admin RRHH', initials: 'ES' },
-  { email: 'f.hernandez@areya.com.mx', pass: 'admin2026', name: 'Francisco Hernández', rol: 'Director RRHH', initials: 'FH' },
-  { email: 'demo', pass: 'demo', name: 'Demo Admin', rol: 'Admin RRHH', initials: 'DA' },
-]
-
-const STATUS_BADGE = {
-  Activo: 'badge-active',
-  Onboarding: 'badge-onboarding',
-  Offboarding: 'badge-offboarding',
-  Inactivo: 'badge-inactive',
-}
+// â”€â”€â”€ CONSTANTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MASTER_COL_MAP = {
   'id colaborador':'id_colaborador','status':'status','uen':'uen','razon social':'razon_social',
   'nombre':'nombre','apellido paterno':'ap_pat','ap. paterno':'ap_pat','apellido materno':'ap_mat','ap. materno':'ap_mat',
-  'fecha de nacimiento':'fecha_nac','fecha nacimiento':'fecha_nac','genero':'genero','género':'genero',
+  'fecha de nacimiento':'fecha_nac','fecha nacimiento':'fecha_nac','genero':'genero','gÃ©nero':'genero',
   'estado civil':'estado_civil','nacionalidad':'nacionalidad','rfc':'rfc','curp':'curp','nss':'nss',
-  'direccion':'direccion','dirección':'direccion','municipio':'municipio',
+  'direccion':'direccion','direcciÃ³n':'direccion','municipio':'municipio',
   'fecha de ingreso':'fecha_ingreso','fecha ingreso':'fecha_ingreso',
-  'departamento':'departamento','area':'departamento','área':'departamento',
+  'departamento':'departamento','area':'departamento','Ã¡rea':'departamento',
   'cargo':'cargo','puesto':'cargo','tipo de contrato':'tipo_contrato','tipo contrato':'tipo_contrato',
   'jefe directo':'jefe_directo','supervisor':'jefe_directo',
   'email corporativo':'email_corporativo','correo corporativo':'email_corporativo',
   'fecha termino':'fecha_termino','razon de termino':'razon_termino',
-  'antiguedad':'antiguedad','antigüedad':'antiguedad',
+  'antiguedad':'antiguedad','antigÃ¼edad':'antiguedad',
   'familia de puesto':'familia_puesto','nivel tab':'nivel_tab','nivel':'nivel_tab',
   'gente a cargo':'gente_a_cargo','sueldo bruto':'sueldo_bruto','sueldo neto':'sueldo_neto',
   'gasolina':'gasolina','despensa':'despensa','fondo de ahorro':'fondo_ahorro',
@@ -39,108 +39,1647 @@ const MASTER_COL_MAP = {
 }
 
 const TAREAS_COL_MAP = {
-  'nivel':'nivel','categoria':'categoria','categoría':'categoria',
-  'titulo':'titulo','título':'titulo','descripcion':'descripcion','descripción':'descripcion','orden':'orden',
+  'nivel':'nivel','categoria':'categoria','categorÃ­a':'categoria',
+  'titulo':'titulo','tÃ­tulo':'titulo','descripcion':'descripcion','descripciÃ³n':'descripcion','orden':'orden',
 }
+
+const STATUS_CLS = {
+  Pendiente: 'bg-slate-100 text-slate-700',
+  Activo: 'bg-emerald-100 text-emerald-800',
+  Onboarding: 'bg-indigo-100 text-indigo-800',
+  Offboarding: 'bg-amber-100 text-amber-800',
+  Inactivo: 'bg-gray-100 text-gray-500',
+}
+
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const BRAND = '#1A1A2E'
+const ACCENT = '#4F46E5'
+const CHART_COLORS = [ACCENT,'#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#EA580C']
+const OFFBOARDING_REASON_TYPES = {
+  Voluntaria: [
+    'Mejor oferta econÃ³mica',
+    'Mejor oportunidad de crecimiento',
+    'Cambio de industria o carrera',
+    'Motivos personales',
+    'Motivos familiares',
+    'Cambio de residencia',
+    'Salud',
+    'Estudios',
+    'Emprendimiento',
+    'Inconformidad con liderazgo',
+    'Inconformidad con ambiente laboral',
+    'Inconformidad con compensaciÃ³n',
+    'Inconformidad con carga de trabajo',
+    'Falta de desarrollo profesional',
+    'Falta de flexibilidad laboral',
+  ],
+  Involuntaria: [
+    'Bajo desempeÃ±o',
+    'Incumplimiento de polÃ­ticas',
+    'Reestructura organizacional',
+    'EliminaciÃ³n de puesto',
+    'Fin de contrato temporal',
+    'Ausentismo',
+    'Falta grave o conducta inapropiada',
+    'Abandono de trabajo',
+    'No aprobaciÃ³n de periodo de prueba',
+    'Ajuste presupuestal',
+  ],
+  Mutua: [
+    'SeparaciÃ³n por acuerdo mutuo',
+    'ReubicaciÃ³n no viable',
+    'Cambio de rol no aceptado',
+    'Cierre de proyecto',
+    'Condiciones laborales no compatibles',
+  ],
+}
+
+// â”€â”€â”€ UTILITIES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function normalizeKey(k) { return k.toString().toLowerCase().trim().replace(/\s+/g,' ') }
 function mapRow(row, colMap) {
-  const mapped = {}
-  Object.entries(row).forEach(([k, v]) => {
-    const db = colMap[normalizeKey(k)]
-    if (db) mapped[db] = v === '' ? null : v
+  const out = {}
+  Object.entries(row).forEach(([k,v]) => { const db = colMap[normalizeKey(k)]; if (db) out[db] = v==='' ? null : v })
+  return out
+}
+const fmt = n => n != null ? '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}) : 'â€”'
+const fmtDate = d => { if(!d) return 'â€”'; try { return new Date(d+'T12:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) } catch { return d } }
+const yrsDiff = d => d ? (Date.now()-new Date(d).getTime())/(1000*60*60*24*365.25) : 0
+
+async function adminAuth(action, payload = {}) {
+  const res = await fetch('/api/admin-auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...payload }),
   })
-  return mapped
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const error = new Error(data.error || 'server_error')
+    error.code = data.error || 'server_error'
+    throw error
+  }
+  return data
 }
 
+function exportWorkbook(fileName, sheets) {
+  const wb = XLSX.utils.book_new()
+  sheets.forEach(({ name, rows }) => {
+    const ws = XLSX.utils.json_to_sheet(rows)
+    XLSX.utils.book_append_sheet(wb, ws, name)
+  })
+  XLSX.writeFile(wb, fileName)
+}
+
+// â”€â”€â”€ SHARED CHART BASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+const BASE_OPTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#9CA3AF' } },
+    y: { grid: { color: 'rgba(0,0,0,.04)' }, ticks: { font: { size: 10 }, color: '#9CA3AF' }, beginAtZero: true },
+  },
+}
+
+// â”€â”€â”€ KPICARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function KpiCard({ label, value, sub, color = BRAND }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-4" style={{ borderLeft: `3px solid ${color}` }}>
+      <div className="font-serif text-2xl font-bold leading-none" style={{ color }}>{value ?? 'â€”'}</div>
+      <div className="text-gray-500 text-xs mt-1.5">{label}</div>
+      {sub && <div className="text-xs mt-1 font-semibold" style={{ color }}>{sub}</div>}
+    </div>
+  )
+}
+
+// â”€â”€â”€ CHART CARD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function ChartCard({ title, height = 190, canvasRef, children }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-4">
+      <div className="font-serif text-sm font-bold mb-3">{title}</div>
+      {children || <div style={{ height, position: 'relative' }}><canvas ref={canvasRef} /></div>}
+    </div>
+  )
+}
+
+// â”€â”€â”€ PERSONAL TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function PersonalTab({ stats }) {
+  const genRef = useRef(null)
+  const gen2Ref = useRef(null)
+  const uenRef = useRef(null)
+  const antRef = useRef(null)
+  const areaRef = useRef(null)
+
+  useEffect(() => {
+    if (!stats || !genRef.current) return
+    const c = new Chart(genRef.current, {
+      type: 'bar',
+      data: {
+        labels: ['Gen Zn(94-10)', 'Millennialsn(81-93)', 'Gen Xn(69-80)', 'Baby Boomn(49-68)'],
+        datasets: [{ data: stats.genPct, backgroundColor: '#EA580C', borderRadius: 5, borderSkipped: false }],
+      },
+      options: { ...BASE_OPTS, plugins: { ...BASE_OPTS.plugins, tooltip: { callbacks: { label: c => c.parsed.y+'%' } } } },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  useEffect(() => {
+    if (!stats || !gen2Ref.current) return
+    const labels = Object.keys(stats.generoMap)
+    const data = Object.values(stats.generoMap)
+    const c = new Chart(gen2Ref.current, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: [BRAND, '#EA580C'], borderWidth: 0, hoverOffset: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10, padding: 8 } } } },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  useEffect(() => {
+    if (!stats || !uenRef.current) return
+    const labels = Object.keys(stats.uenMap)
+    const data = Object.values(stats.uenMap)
+    const c = new Chart(uenRef.current, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: CHART_COLORS, borderWidth: 0, hoverOffset: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 9 }, boxWidth: 8, padding: 5 } } } },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  useEffect(() => {
+    if (!stats || !antRef.current) return
+    const labels = Object.keys(stats.antigMap)
+    const data = Object.values(stats.antigMap)
+    const c = new Chart(antRef.current, {
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: '#EA580C', borderRadius: 5, borderSkipped: false }] },
+      options: BASE_OPTS,
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  useEffect(() => {
+    if (!stats || !areaRef.current) return
+    const sorted = Object.entries(stats.deptMap).sort((a,b) => b[1]-a[1]).slice(0, 8)
+    const c = new Chart(areaRef.current, {
+      type: 'bar',
+      data: { labels: sorted.map(([l]) => l), datasets: [{ data: sorted.map(([,v]) => v), backgroundColor: BRAND, borderRadius: 4, borderSkipped: false }] },
+      options: { ...BASE_OPTS, indexAxis: 'y' },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  if (!stats) return <div className="text-gray-400 text-sm py-12 text-center">Cargando datos...</div>
+
+  return (
+    <div>
+      {/* KPIs Power-BI style */}
+      <div className="grid gap-3 mb-5" style={{ gridTemplateColumns: '180px 1fr 1fr' }}>
+        <div className="flex flex-col gap-3">
+          {[
+            { label: 'Headcount activo', value: stats.headcount, bg: BRAND },
+            { label: '% ingresos 2025', value: stats.pctIngr2025+'%', bg: '#EA580C' },
+            { label: '% ingresos 2026', value: stats.pctIngr2026+'%', bg: '#EA580C' },
+            { label: 'Prom. antigÃ¼edad (aÃ±os)', value: stats.avgAntig, bg: '#0F766E' },
+            { label: 'Prom. edad (aÃ±os)', value: stats.avgEdad, bg: '#0F766E' },
+          ].map(({ label, value, bg }) => (
+            <div key={label} className="rounded-xl p-3.5" style={{ background: bg }}>
+              <div className="font-serif text-2xl font-bold text-white leading-none">{value ?? 'â€”'}</div>
+              <div className="text-white/60 text-xs mt-1">{label}</div>
+            </div>
+          ))}
+        </div>
+        <ChartCard title="Generaciones Areya"><div style={{ height: 190, position: 'relative' }}><canvas ref={genRef} /></div></ChartCard>
+        <ChartCard title="GÃ©nero"><div style={{ height: 190, position: 'relative' }}><canvas ref={gen2Ref} /></div></ChartCard>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <ChartCard title="Headcount por UEN"><div style={{ height: 190, position: 'relative' }}><canvas ref={uenRef} /></div></ChartCard>
+        <ChartCard title="AntigÃ¼edad en la empresa"><div style={{ height: 190, position: 'relative' }}><canvas ref={antRef} /></div></ChartCard>
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl shadow-sm p-5 text-center">
+          <div className="font-serif text-sm font-bold mb-2">Menos de 6 meses</div>
+          <div className="font-serif text-4xl font-bold" style={{ color: '#F59E0B' }}>{stats.menos6m}</div>
+          <div className="text-gray-400 text-xs mt-1">colaboradores</div>
+        </div>
+        <div className="bg-white rounded-xl shadow-sm p-5 text-center">
+          <div className="font-serif text-sm font-bold mb-2">MÃ¡s de 6 meses</div>
+          <div className="font-serif text-4xl font-bold" style={{ color: '#10B981' }}>{stats.mas6m}</div>
+          <div className="text-gray-400 text-xs mt-1">colaboradores</div>
+        </div>
+        <ChartCard title="DistribuciÃ³n por Ã¡rea"><div style={{ height: 150, position: 'relative' }}><canvas ref={areaRef} /></div></ChartCard>
+      </div>
+    </div>
+  )
+}
+
+// â”€â”€â”€ FINANZAS TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function FinanzasTab({ stats }) {
+  const distRef = useRef(null)
+
+  useEffect(() => {
+    if (!stats || !distRef.current || !stats.distPct.length) return
+    const c = new Chart(distRef.current, {
+      type: 'doughnut',
+      data: {
+        labels: stats.distPct.map(d => d.l),
+        datasets: [{ data: stats.distPct.map(d => d.v), backgroundColor: CHART_COLORS, borderWidth: 0, hoverOffset: 4 }],
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10, padding: 6 } } } },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  if (!stats) return <div className="text-gray-400 text-sm py-12 text-center">Cargando datos...</div>
+
+  const active = stats.activos_ob_list || []
+
+  return (
+    <div>
+      {/* Totales */}
+      <div className="rounded-xl p-5 text-white mb-5 grid grid-cols-3 gap-5" style={{ background: 'linear-gradient(135deg, #1A1A2E, #2D4BFF)' }}>
+        {[
+          { label: 'Costo total mensual', value: fmt(stats.costoTotal) },
+          { label: 'Costo total anual', value: fmt(stats.costoAnual) },
+          { label: 'Costo promedio / empleado / mes', value: fmt(Math.round(stats.promCosto)) },
+        ].map(({ label, value }) => (
+          <div key={label}>
+            <div className="font-serif text-2xl font-bold">{value}</div>
+            <div className="text-white/60 text-xs mt-1">{label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-2 gap-4 mb-5">
+        <ChartCard title="DistribuciÃ³n de costos">
+          <div style={{ height: 190, position: 'relative' }}><canvas ref={distRef} /></div>
+        </ChartCard>
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="font-serif text-sm font-bold mb-3">Top 5 por costo real mensual</div>
+          <div className="flex flex-col gap-2">
+            {[...active].sort((a,b) => (b.costo_real_mens||0)-(a.costo_real_mens||0)).slice(0,5).map(e => (
+              <div key={e.id} className="flex items-center justify-between text-sm">
+                <span className="text-gray-700 truncate max-w-48">{e.nombre_completo || 'â€”'}</span>
+                <span className="font-bold text-emerald-600 ml-2 flex-shrink-0">{fmt(e.costo_real_mens)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="font-serif text-sm font-bold mb-3">Desglose por colaborador</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-gray-50">
+                {['Colaborador','Sueldo bruto','Beneficios','Costo real/mes','Costo real/aÃ±o'].map(h => (
+                  <th key={h} className="px-3 py-2 text-left font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap border-b border-gray-100">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {active.map(e => {
+                const benef = (e.despensa||0)+(e.fondo_ahorro||0)+(e.gasolina||0)+(e.prima_vacacional||0)+(e.monto_celular||0)+(e.sgmm||0)+(e.seguro_vida||0)+(e.mant_auto||0)
+                return (
+                  <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50">
+                    <td className="px-3 py-2.5">
+                      <div className="font-semibold text-gray-800">{e.nombre_completo}</div>
+                      <div className="text-gray-400">{e.cargo}</div>
+                    </td>
+                    <td className="px-3 py-2.5">{fmt(e.sueldo_bruto)}</td>
+                    <td className="px-3 py-2.5">{fmt(benef)}</td>
+                    <td className="px-3 py-2.5 font-bold" style={{ color: ACCENT }}>{fmt(e.costo_real_mens)}</td>
+                    <td className="px-3 py-2.5">{fmt(e.costo_real_anual)}</td>
+                  </tr>
+                )
+              })}
+              {active.length === 0 && (
+                <tr><td colSpan={5} className="text-center py-6 text-gray-400">Sin datos de compensaciÃ³n en el master</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// â”€â”€â”€ ATTRITION TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function AttritionTab({ stats }) {
+  const motivosRef = useRef(null)
+  const bajasRef = useRef(null)
+  const bajasDeptRef = useRef(null)
+
+  useEffect(() => {
+    if (!stats || !motivosRef.current) return
+    const entries = Object.entries(stats.motivoMap)
+    const c = new Chart(motivosRef.current, {
+      type: 'doughnut',
+      data: { labels: entries.map(([l]) => l), datasets: [{ data: entries.map(([,v]) => v), backgroundColor: CHART_COLORS, borderWidth: 0, hoverOffset: 4 }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10, padding: 6 } } } },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  useEffect(() => {
+    if (!stats || !bajasRef.current) return
+    const c = new Chart(bajasRef.current, {
+      type: 'bar',
+      data: { labels: MESES, datasets: [{ data: stats.bajasMes, backgroundColor: 'rgba(239,68,68,.8)', borderRadius: 4, borderSkipped: false }] },
+      options: BASE_OPTS,
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  useEffect(() => {
+    if (!stats || !bajasDeptRef.current) return
+    const entries = Object.entries(stats.bajasDeptMap)
+    const c = new Chart(bajasDeptRef.current, {
+      type: 'bar',
+      data: { labels: entries.map(([l]) => l), datasets: [{ data: entries.map(([,v]) => v), backgroundColor: 'rgba(239,68,68,.7)', borderRadius: 4, borderSkipped: false }] },
+      options: { ...BASE_OPTS, indexAxis: 'y' },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  if (!stats) return <div className="text-gray-400 text-sm py-12 text-center">Cargando datos...</div>
+
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        <KpiCard label="Bajas este aÃ±o" value={stats.bajasAnio} color="#EF4444" />
+        <KpiCard label="Tasa de rotaciÃ³n" value={stats.tasaRot + '%'} color="#F59E0B" sub="Prom. industria: 8%" />
+        <KpiCard label="AntigÃ¼edad prom. al salir" value={stats.avgAntigSalida + ' aÃ±os'} color="#10B981" />
+        <KpiCard label="Offboardings activos" value={stats.offboarding} color={ACCENT} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <ChartCard title="Motivos de salida"><div style={{ height: 190, position: 'relative' }}><canvas ref={motivosRef} /></div></ChartCard>
+        <ChartCard title="Bajas por mes"><div style={{ height: 190, position: 'relative' }}><canvas ref={bajasRef} /></div></ChartCard>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <ChartCard title="Bajas por Ã¡rea"><div style={{ height: 180, position: 'relative' }}><canvas ref={bajasDeptRef} /></div></ChartCard>
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="font-serif text-sm font-bold mb-3">Historial de bajas</div>
+          {stats.inactivos_list.length === 0
+            ? <div className="text-gray-400 text-sm text-center py-6">Sin bajas registradas</div>
+            : stats.inactivos_list.map(e => (
+              <div key={e.id} className="flex items-start justify-between py-2.5 border-b border-gray-50 last:border-0 text-sm">
+                <div>
+                  <div className="font-semibold">{e.nombre_completo}</div>
+                  <div className="text-gray-400 text-xs">{e.departamento} Â· {fmtDate(e.fecha_termino)}</div>
+                </div>
+                <span className="text-xs text-red-600 font-medium ml-2 flex-shrink-0">{e.razon_termino || 'â€”'}</span>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// â”€â”€â”€ ONBOARDING TAB â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function OnboardingTabDash({ stats }) {
+  if (!stats) return <div className="text-gray-400 text-sm py-12 text-center">Cargando datos...</div>
+  const active = stats.activos_ob_list.filter(e => e.status === 'Onboarding')
+  return (
+    <div>
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        <KpiCard label="En proceso" value={stats.onboarding} color={ACCENT} />
+        <KpiCard label="En offboarding" value={stats.offboarding} color="#F59E0B" />
+        <KpiCard label="Total activos" value={stats.headcount} color="#10B981" />
+        <KpiCard label="Total headcount" value={stats.total} color={BRAND} />
+      </div>
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="font-serif text-sm font-bold mb-3">Empleados en onboarding</div>
+        {active.length === 0
+          ? <div className="text-gray-400 text-sm text-center py-6">No hay colaboradores en onboarding actualmente</div>
+          : active.map(e => (
+            <div key={e.id} className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: ACCENT }}>
+                {(e.nombre_completo||'?').split(' ').slice(0,2).map(w=>w[0]).join('')}
+              </div>
+              <div className="flex-1">
+                <div className="text-sm font-semibold">{e.nombre_completo}</div>
+                <div className="text-xs text-gray-400">{e.cargo} Â· {e.departamento}</div>
+              </div>
+              <div className="text-xs text-gray-400">Ingreso: {fmtDate(e.fecha_ingreso)}</div>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-semibold">Onboarding</span>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+  )
+}
+
+// â”€â”€â”€ DASHBOARD PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function DashboardPage({ stats, empleados, pendingAdmins, onApproveAdmin, dashTab, setDashTab }) {
+  const tabs = [
+    { id: 'personal', label: 'Personal' },
+    { id: 'onboarding', label: 'Onboarding' },
+    { id: 'finanzas', label: 'Finanzas' },
+    { id: 'attrition', label: 'Attrition' },
+  ]
+
+  const exportDashboard = () => {
+    if (!stats) return
+    exportWorkbook('reporte_dashboard_rrhh.xlsx', [
+      {
+        name: 'Resumen',
+        rows: [
+          { indicador: 'Headcount activo', valor: stats.headcount },
+          { indicador: 'En onboarding', valor: stats.onboarding },
+          { indicador: 'En offboarding', valor: stats.offboarding },
+          { indicador: 'Total colaboradores', valor: stats.total },
+          { indicador: 'Bajas del año', valor: stats.bajasAnio },
+          { indicador: 'Tasa de rotacion', valor: stats.tasaRot },
+          { indicador: 'Costo total mensual', valor: stats.costoTotal },
+          { indicador: 'Costo total anual', valor: stats.costoAnual },
+        ],
+      },
+      {
+        name: 'Plantilla',
+        rows: empleados.map(e => ({
+          nombre: e.nombre_completo,
+          status: e.status,
+          departamento: e.departamento,
+          cargo: e.cargo,
+          fecha_ingreso: e.fecha_ingreso,
+          fecha_termino: e.fecha_termino,
+          razon_termino: e.razon_termino,
+        })),
+      },
+    ])
+  }
+
+  return (
+    <div>
+      {/* Pending admin requests */}
+      {pendingAdmins.length > 0 && (
+        <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <div className="font-semibold text-sm text-amber-800 mb-2">
+            ðŸ”” {pendingAdmins.length} solicitud{pendingAdmins.length > 1 ? 'es' : ''} de acceso al panel
+          </div>
+          {pendingAdmins.map(r => (
+            <div key={r.id} className="flex items-center justify-between py-2 border-t border-amber-200">
+              <span className="text-sm font-mono text-amber-900">{r.email}</span>
+              <button onClick={() => onApproveAdmin(r.id, r.email)}
+                className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all"
+                style={{ background: '#10B981', color: '#fff' }}>
+                âœ“ Aprobar acceso
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+        <div className="flex gap-1.5 bg-gray-100 rounded-xl p-1 w-fit">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setDashTab(t.id)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${dashTab === t.id ? 'bg-white text-brand shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+              style={dashTab === t.id ? { color: BRAND } : {}}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={exportDashboard} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">
+          Descargar reporte
+        </button>
+      </div>
+
+      {dashTab === 'personal' && <PersonalTab stats={stats} />}
+      {dashTab === 'onboarding' && <OnboardingTabDash stats={stats} />}
+      {dashTab === 'finanzas' && <FinanzasTab stats={stats} />}
+      {dashTab === 'attrition' && <AttritionTab stats={stats} />}
+    </div>
+  )
+}
+
+// â”€â”€â”€ MASTER TABLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilter, loading, onLoad, showToast }) {
+  const filtered = empleados.filter(e => {
+    const q = search.toLowerCase()
+    const match = !q || (e.nombre_completo||'').toLowerCase().includes(q) || (e.rfc||'').toLowerCase().includes(q) || (e.email_corporativo||'').toLowerCase().includes(q)
+    const st = !statusFilter || e.status === statusFilter
+    return match && st
+  })
+
+  const exportMaster = () => {
+    exportWorkbook('master_empleados.xlsx', [
+      {
+        name: 'Master',
+        rows: filtered.map(e => ({
+          id_colaborador: e.id_colaborador,
+          nombre_completo: e.nombre_completo,
+          rfc: e.rfc,
+          curp: e.curp,
+          nss: e.nss,
+          departamento: e.departamento,
+          cargo: e.cargo,
+          email_corporativo: e.email_corporativo,
+          fecha_ingreso: e.fecha_ingreso,
+          fecha_termino: e.fecha_termino,
+          status: e.status,
+          sueldo_bruto: e.sueldo_bruto,
+          costo_real_mens: e.costo_real_mens,
+        })),
+      },
+    ])
+  }
+
+  return (
+    <div>
+      <div className="flex gap-3 mb-4 flex-wrap">
+        <input type="text" placeholder="Buscar nombre, RFC, email..." value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-48 px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500" />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none">
+          <option value="">Todos los estatus</option>
+          {['Pendiente','Activo','Onboarding','Offboarding','Inactivo'].map(s => <option key={s}>{s}</option>)}
+        </select>
+        <button onClick={exportMaster} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">Descargar Excel</button>
+        <button onClick={onLoad} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">â†» Actualizar</button>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-50 border-b border-gray-100">
+                {['ID','Nombre','RFC','Departamento','Cargo','Email corporativo','Ingreso','Sueldo bruto','Costo real/mes','Status'].map(h => (
+                  <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading && <tr><td colSpan={10} className="text-center py-10 text-gray-400">Cargando...</td></tr>}
+              {!loading && filtered.length === 0 && (
+                <tr><td colSpan={10} className="text-center py-10 text-gray-400">
+                  {empleados.length === 0 ? 'No hay registros. Importa el master para comenzar.' : 'Sin resultados para esa bÃºsqueda.'}
+                </td></tr>
+              )}
+              {filtered.map(e => (
+                <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 text-xs text-gray-400 font-mono">{e.id_colaborador}</td>
+                  <td className="px-4 py-3 font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{e.nombre_completo}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{e.rfc || 'â€”'}</td>
+                  <td className="px-4 py-3 text-gray-600">{e.departamento || 'â€”'}</td>
+                  <td className="px-4 py-3 text-gray-600 max-w-36 truncate">{e.cargo || 'â€”'}</td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: ACCENT }}>{e.email_corporativo || 'â€”'}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(e.fecha_ingreso)}</td>
+                  <td className="px-4 py-3 text-xs font-semibold">{fmt(e.sueldo_bruto)}</td>
+                  <td className="px-4 py-3 text-xs font-bold text-emerald-700">{fmt(e.costo_real_mens)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_CLS[e.status] || 'bg-gray-100 text-gray-500'}`}>{e.status}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">
+          {filtered.length} de {empleados.length} colaboradores
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// â”€â”€â”€ IMPORT PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function ImportPage({ importTab, setImportTab, importData, setImportData, importLog, setImportLog, importing, onProcess, onRun, onDownloadTemplate }) {
+  return (
+    <div className="max-w-2xl">
+      <div className="flex gap-2 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
+        {['master', 'tareas'].map(t => (
+          <button key={t} onClick={() => { setImportTab(t); setImportData(null); setImportLog(null) }}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${importTab === t ? 'bg-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+            style={importTab === t ? { color: BRAND } : {}}>
+            {t === 'master' ? 'Master de empleados' : 'Plantilla de tareas'}
+          </button>
+        ))}
+      </div>
+
+      <div className={`bg-white rounded-xl shadow-sm p-4 mb-4 border-l-4 ${importTab === 'master' ? 'border-indigo-500' : 'border-purple-500'}`}>
+        {importTab === 'master' ? (
+          <div className="text-sm text-gray-600">
+            <strong className="text-gray-800">Columna requerida:</strong>{' '}
+            <code className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-xs">ID Colaborador</code>
+            <span className="text-xs text-gray-500 block mt-1">Carga completa o actualizaciÃ³n parcial. Celdas vacÃ­as â†’ null.</span>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">
+            Columnas: {['nivel','categoria','titulo','descripcion','orden'].map(c => (
+              <code key={c} className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-xs mr-1">{c}</code>
+            ))}
+            <button onClick={onDownloadTemplate} className="block text-xs text-purple-600 underline mt-1">â¬‡ Descargar plantilla</button>
+          </div>
+        )}
+      </div>
+
+      {!importData && !importLog && (
+        <label className="block border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all">
+          <div className="text-3xl mb-3">ðŸ“‚</div>
+          <div className="text-sm font-semibold text-gray-700 mb-1">Arrastra o haz clic para subir</div>
+          <div className="text-xs text-gray-400">.xlsx Â· .xls Â· .csv</div>
+          <input type="file" accept=".xlsx,.xls,.csv" className="hidden"
+            onChange={e => e.target.files[0] && onProcess(e.target.files[0], importTab)} />
+        </label>
+      )}
+
+      {importData && !importLog && (
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="font-serif text-sm font-bold mb-3">{importData.fileName}</div>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {[{ n: importData.rows.length, l: 'Total filas' },{ n: Object.keys(importData.rows[0]).length, l: 'Columnas' },{ n: importData.type==='master'?'UPSERT':'Tareas', l: 'Modo' }].map((s,i) => (
+              <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
+                <div className="font-serif text-xl font-bold" style={{ color: ACCENT }}>{s.n}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-gray-100 mb-4">
+            <table className="text-xs w-full border-collapse">
+              <thead><tr className="bg-gray-50">{Object.keys(importData.rows[0]).map(h => <th key={h} className="px-3 py-2 text-left font-bold text-gray-400 whitespace-nowrap border-b border-gray-100">{h}</th>)}</tr></thead>
+              <tbody>{importData.rows.slice(0,5).map((r,i) => <tr key={i} className="border-b border-gray-50">{Object.keys(importData.rows[0]).map(h => <td key={h} className="px-3 py-2 whitespace-nowrap max-w-32 truncate">{r[h]??''}</td>)}</tr>)}</tbody>
+            </table>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setImportData(null)} className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50">Cancelar</button>
+            <button onClick={onRun} disabled={importing}
+              className="px-4 py-2 text-sm font-semibold rounded-lg text-white transition-all disabled:opacity-50"
+              style={{ background: ACCENT }}>
+              {importing ? 'Importando...' : `Importar ${importData.rows.length} filas â†’`}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {importLog && (
+        <div className="bg-white rounded-xl shadow-sm p-4">
+          <div className="font-serif text-sm font-bold mb-3">Resultado</div>
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {[{ n: importLog.inserted, l: 'Insertados', c: ACCENT },{ n: importLog.updated, l: 'Actualizados', c: '#10B981' },{ n: importLog.skipped, l: 'Omitidos', c: importLog.skipped ? '#EF4444' : '#9CA3AF' }].map((s,i) => (
+              <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
+                <div className="font-serif text-2xl font-bold" style={{ color: s.c }}>{s.n}</div>
+                <div className="text-xs text-gray-400 mt-0.5">{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto font-mono text-xs leading-relaxed">
+            {importLog.lines.map((l,i) => (
+              <div key={i} className={l.startsWith('âœ“')||l.startsWith('+') ? 'text-emerald-700' : l.startsWith('âš ') ? 'text-amber-600' : 'text-red-600'}>{l}</div>
+            ))}
+          </div>
+          <button onClick={() => { setImportData(null); setImportLog(null) }}
+            className="mt-3 w-full py-2 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50">
+            Nueva importaciÃ³n
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// â”€â”€â”€ ONBOARDING PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function OnboardingPageAdmin({ empleados, onLoad }) {
+  const [tab, setTab] = useState('pendientes')
+  const [modal, setModal] = useState(null)
+  const [cfg, setCfg] = useState({ email_corporativo: '', nivel_tab: '', uen: '', razon_social: '' })
+  const [saving, setSaving] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
+
+  const showToast = msg => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000) }
+  const pendientes = empleados.filter(e => e.status === 'Pendiente')
+  const configurados = empleados.filter(e => e.onboarding_configurado)
+  const enOB = empleados.filter(e => e.status === 'Onboarding')
+
+  const openModal = (empleado) => {
+    setModal(empleado)
+    setCfg({
+      email_corporativo: empleado.email_corporativo || '',
+      nivel_tab: empleado.nivel_tab || '',
+      uen: empleado.uen || '',
+      razon_social: empleado.razon_social || '',
+    })
+  }
+
+  const handleConfigurar = async () => {
+    if (!cfg.email_corporativo || cfg.nivel_tab === '') {
+      showToast('Asigna correo corporativo y nivel')
+      return
+    }
+    setSaving(true)
+    try {
+      const comp = calcCompensacion(Number(cfg.nivel_tab))
+      const empleadoData = {
+        email_corporativo: cfg.email_corporativo.trim().toLowerCase(),
+        nivel_tab: Number(cfg.nivel_tab),
+        uen: cfg.uen,
+        razon_social: cfg.razon_social,
+        status: 'Onboarding',
+        ...comp,
+      }
+
+      const result = await configurarNuevoIngreso(modal.id, empleadoData)
+      const access = result.access
+
+      try {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'welcome_empleado',
+            data: {
+              nombre: modal.nombre,
+              email_corporativo: cfg.email_corporativo.trim().toLowerCase(),
+              cargo: modal.cargo,
+              departamento: modal.departamento,
+              activation_link: `https://areya-red.vercel.app/portal?token=${access.token_activacion}`,
+            },
+          }),
+        })
+      } catch {}
+
+      showToast(`Onboarding configurado y acceso enviado a ${cfg.email_corporativo}`)
+      setModal(null)
+      onLoad?.()
+    } catch (e) {
+      showToast('Error al configurar: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const tabBtn = (id, label, count) => (
+    <button onClick={() => setTab(id)}
+      className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${tab === id ? 'bg-white shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}
+      style={tab === id ? { color: BRAND } : {}}>
+      {label}
+      {count > 0 && (
+        <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === id ? 'bg-red-100 text-red-700' : 'bg-gray-200 text-gray-600'}`}>{count}</span>
+      )}
+    </button>
+  )
+
+  return (
+    <div>
+      <div className="flex gap-1.5 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
+        {tabBtn('pendientes', 'Pendientes de configurar', pendientes.length)}
+        {tabBtn('en_proceso', 'En proceso', enOB.length)}
+        {tabBtn('configurados', 'Configurados', configurados.length)}
+      </div>
+
+      {tab === 'pendientes' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {pendientes.length === 0
+            ? <div className="text-center py-10 text-gray-400 text-sm">Sin formularios pendientes</div>
+            : pendientes.map(n => (
+                <div key={n.id} className="flex items-center gap-4 p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: '#F59E0B' }}>
+                    {(n.nombre_completo || '?').split(' ').slice(0,2).map(w => w[0]).join('')}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold">{n.nombre_completo}</div>
+                    <div className="text-xs text-gray-400">{n.cargo} · {n.departamento}</div>
+                    <div className="text-xs text-gray-400 font-mono">{n.email_personal}</div>
+                  </div>
+                  <div className="text-xs text-gray-400 text-right mr-3">
+                    <div>Ingreso: {fmtDate(n.fecha_ingreso)}</div>
+                    <div>{n.tipo_contrato}</div>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold mr-3">Pendiente</span>
+                  <button onClick={() => openModal(n)}
+                    className="px-4 py-2 text-sm font-semibold rounded-lg text-white transition-all flex-shrink-0"
+                    style={{ background: ACCENT }}>
+                    Configurar
+                  </button>
+                </div>
+              ))
+          }
+        </div>
+      )}
+
+      {tab === 'en_proceso' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {enOB.length === 0
+            ? <div className="text-center py-10 text-gray-400 text-sm">No hay colaboradores en onboarding actualmente</div>
+            : enOB.map(e => (
+                <div key={e.id} className="flex items-center gap-4 p-4 border-b border-gray-50 last:border-0">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: ACCENT }}>
+                    {(e.nombre_completo || '?').split(' ').slice(0,2).map(w => w[0]).join('')}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold">{e.nombre_completo}</div>
+                    <div className="text-xs text-gray-400">{e.cargo} · {e.departamento}</div>
+                  </div>
+                  <div className="text-xs text-gray-400 text-right">
+                    <div>Ingreso: {fmtDate(e.fecha_ingreso)}</div>
+                    <div className="font-mono" style={{ color: ACCENT }}>{e.email_corporativo || '—'}</div>
+                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-semibold">Onboarding</span>
+                </div>
+              ))
+          }
+        </div>
+      )}
+
+      {tab === 'configurados' && (
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          {configurados.length === 0
+            ? <div className="text-center py-10 text-gray-400 text-sm">Sin registros configurados aún</div>
+            : configurados.map(n => (
+                <div key={n.id} className="flex items-center gap-4 p-4 border-b border-gray-50 last:border-0">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: '#10B981' }}>
+                    {(n.nombre_completo || '?').split(' ').slice(0,2).map(w => w[0]).join('')}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold">{n.nombre_completo}</div>
+                    <div className="text-xs text-gray-400">{n.cargo} · {n.departamento}</div>
+                  </div>
+                  <div className="text-xs font-mono" style={{ color: ACCENT }}>{n.email_corporativo || '—'}</div>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">Configurado</span>
+                </div>
+              ))
+          }
+        </div>
+      )}
+
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.45)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 pt-6 pb-4 flex items-start justify-between" style={{ borderBottom: '1px solid #F3F4F6' }}>
+              <div>
+                <div className="font-serif text-lg font-bold">Configurar onboarding</div>
+                <div className="text-sm text-gray-500 mt-0.5">{modal.nombre_completo}</div>
+              </div>
+              <button onClick={() => setModal(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">x</button>
+            </div>
+
+            <div className="px-6 py-4">
+              <div className="bg-gray-50 rounded-xl p-4 mb-4 grid grid-cols-2 gap-3 text-sm">
+                {[
+                  ['Puesto', modal.cargo], ['Área', modal.departamento],
+                  ['Tipo contrato', modal.tipo_contrato], ['Fecha ingreso', fmtDate(modal.fecha_ingreso)],
+                  ['Correo personal', modal.email_personal], ['Jefe directo', modal.jefe_directo],
+                ].map(([l, v]) => (
+                  <div key={l}>
+                    <div className="text-xs text-gray-400 font-semibold uppercase tracking-wide">{l}</div>
+                    <div className="font-semibold text-gray-800">{v || '—'}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                    Correo corporativo a asignar <span className="text-red-500">*</span>
+                  </label>
+                  <input type="email" value={cfg.email_corporativo}
+                    onChange={e => setCfg(c => ({ ...c, email_corporativo: e.target.value }))}
+                    placeholder="nombre.apellido@areya.com.mx"
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500 font-mono" />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                    Nivel de tabulador <span className="text-red-500">*</span>
+                  </label>
+                  <select value={cfg.nivel_tab} onChange={e => setCfg(c => ({ ...c, nivel_tab: e.target.value }))}
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:border-indigo-500">
+                    <option value="">— Seleccionar —</option>
+                    {TABULADOR.map(t => (
+                      <option key={t.n} value={t.n}>{t.n} · {t.f} (${t.ref.toLocaleString('es-MX')})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">UEN</label>
+                  <select value={cfg.uen} onChange={e => setCfg(c => ({ ...c, uen: e.target.value }))}
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:border-indigo-500">
+                    <option value="">— Seleccionar —</option>
+                    {['Areya Viviendas','Área y ambientación','Areya Edificadora Industrial','Areya Desarrolladora Industrial','Areya Desarrollos Industriales'].map(u => (
+                      <option key={u} value={u}>{u}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="col-span-2 flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Razón social</label>
+                  <input value={cfg.razon_social} onChange={e => setCfg(c => ({ ...c, razon_social: e.target.value }))}
+                    placeholder="Areya Edificadora Industrial S.A. de C.V."
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500" />
+                </div>
+              </div>
+
+              {cfg.nivel_tab !== '' && (() => {
+                const comp = calcCompensacion(Number(cfg.nivel_tab))
+                return (
+                  <div className="mt-3 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                    <div className="text-xs font-bold text-indigo-700 uppercase tracking-wide mb-2">Compensación auto-asignada del tabulador</div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      {[
+                        ['Sueldo bruto', fmt(comp.sueldo_bruto)],
+                        ['Sueldo neto', fmt(comp.sueldo_neto)],
+                        ['Costo real/mes', fmt(comp.costo_real_mens)],
+                        ['Despensa', fmt(comp.despensa)],
+                        ['Fondo ahorro', fmt(comp.fondo_ahorro)],
+                        ['Prima vac.', fmt(comp.prima_vacacional)],
+                      ].map(([l, v]) => (
+                        <div key={l}>
+                          <div className="text-indigo-400">{l}</div>
+                          <div className="font-bold text-indigo-800">{v}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button onClick={() => setModal(null)} className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={handleConfigurar} disabled={saving}
+                className="px-5 py-2 text-sm font-semibold rounded-lg text-white transition-all disabled:opacity-50"
+                style={{ background: ACCENT }}>
+                {saving ? 'Guardando...' : 'Crear onboarding y enviar correo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg z-50">
+          {toastMsg}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OffboardingPageAdmin({ entrevistas, onComplete }) {
+  const [selected, setSelected] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [toastMsg, setToastMsg] = useState('')
+  const [form, setForm] = useState({
+    tipo_salida: 'Voluntaria',
+    subcategoria_salida: '',
+    razon_rrhh: '',
+    comentarios_rrhh: '',
+    fecha_termino: new Date().toISOString().slice(0, 10),
+    elegible_recontratacion: true,
+  })
+
+  const showToast = msg => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 3000) }
+
+  const open = (entrevista) => {
+    setSelected(entrevista)
+    setForm({
+      tipo_salida: entrevista.tipo_salida || 'Voluntaria',
+      subcategoria_salida: entrevista.subcategoria_salida || '',
+      razon_rrhh: entrevista.razon_rrhh || '',
+      comentarios_rrhh: entrevista.comentarios_rrhh || '',
+      fecha_termino: entrevista.fecha_termino || new Date().toISOString().slice(0, 10),
+      elegible_recontratacion: entrevista.elegible_recontratacion ?? true,
+    })
+  }
+
+  const handleSave = async () => {
+    if (!form.tipo_salida || !form.subcategoria_salida) {
+      showToast('Selecciona tipo y subcategoría de salida')
+      return
+    }
+    setSaving(true)
+    try {
+      await completeOffboarding(selected.id, form)
+      showToast('Offboarding completado')
+      setSelected(null)
+      onComplete?.()
+    } catch (e) {
+      showToast('Error al completar offboarding: ' + e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const options = OFFBOARDING_REASON_TYPES[form.tipo_salida] || []
+
+  return (
+    <div>
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        {entrevistas.length === 0
+          ? <div className="text-center py-10 text-gray-400 text-sm">No hay offboardings pendientes</div>
+          : entrevistas.map(item => (
+              <div key={item.id} className="flex items-center gap-4 p-4 border-b border-gray-50 last:border-0">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0" style={{ background: '#F59E0B' }}>
+                  {(item.empleados?.nombre_completo || '?').split(' ').slice(0,2).map(w => w[0]).join('')}
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-semibold">{item.empleados?.nombre_completo}</div>
+                  <div className="text-xs text-gray-400">{item.empleados?.cargo} · {item.empleados?.departamento}</div>
+                  <div className="text-xs text-gray-400">Entrevista enviada: {fmtDate(item.submitted_at?.slice(0, 10))}</div>
+                </div>
+                <div className="text-xs text-gray-500 max-w-56">{item.motivo_salida || 'Sin motivo declarado'}</div>
+                <button onClick={() => open(item)} className="px-4 py-2 text-sm font-semibold rounded-lg text-white" style={{ background: ACCENT }}>
+                  Completar offboarding
+                </button>
+              </div>
+            ))
+        }
+      </div>
+
+      {selected && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.45)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden">
+            <div className="px-6 pt-6 pb-4 flex items-start justify-between border-b border-gray-100">
+              <div>
+                <div className="font-serif text-lg font-bold">Completar offboarding</div>
+                <div className="text-sm text-gray-500 mt-0.5">{selected.empleados?.nombre_completo}</div>
+              </div>
+              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">x</button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 px-6 py-5">
+              <div className="bg-gray-50 rounded-xl p-4 text-sm">
+                <div className="font-serif text-sm font-bold mb-3">Respuesta del colaborador</div>
+                <div className="space-y-3">
+                  <div><span className="text-gray-400 block text-xs uppercase font-semibold">Motivo declarado</span><span>{selected.motivo_salida || '—'}</span></div>
+                  <div><span className="text-gray-400 block text-xs uppercase font-semibold">Tiempo en Areya</span><span>{selected.tiempo_empresa || '—'}</span></div>
+                  <div><span className="text-gray-400 block text-xs uppercase font-semibold">Comentarios</span><span>{selected.comentarios_libres || '—'}</span></div>
+                  <div><span className="text-gray-400 block text-xs uppercase font-semibold">Recomendaría Areya</span><span>{selected.recomendaria == null ? '—' : selected.recomendaria ? 'Sí' : 'No'}</span></div>
+                  <div><span className="text-gray-400 block text-xs uppercase font-semibold">Regresaría</span><span>{selected.regresaria == null ? '—' : selected.regresaria ? 'Sí' : 'No'}</span></div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Tipo de salida</label>
+                    <select value={form.tipo_salida} onChange={e => setForm(f => ({ ...f, tipo_salida: e.target.value, subcategoria_salida: '' }))}
+                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:border-indigo-500">
+                      {Object.keys(OFFBOARDING_REASON_TYPES).map(type => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Fecha de término</label>
+                    <input type="date" value={form.fecha_termino} onChange={e => setForm(f => ({ ...f, fecha_termino: e.target.value }))}
+                      className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500" />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Subcategoría</label>
+                  <select value={form.subcategoria_salida} onChange={e => setForm(f => ({ ...f, subcategoria_salida: e.target.value, razon_rrhh: e.target.value }))}
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm bg-white outline-none focus:border-indigo-500">
+                    <option value="">— Seleccionar —</option>
+                    {options.map(option => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Razón principal para dashboard</label>
+                  <input value={form.razon_rrhh} onChange={e => setForm(f => ({ ...f, razon_rrhh: e.target.value }))}
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500"
+                    placeholder="Se usa en attrition" />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Comentarios internos RRHH</label>
+                  <textarea value={form.comentarios_rrhh} onChange={e => setForm(f => ({ ...f, comentarios_rrhh: e.target.value }))}
+                    rows={5}
+                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500 resize-none" />
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">Elegible para recontratación</span>
+                  <button onClick={() => setForm(f => ({ ...f, elegible_recontratacion: true }))}
+                    className={`px-3 py-1.5 rounded-lg text-sm border ${form.elegible_recontratacion ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white border-gray-200 text-gray-600'}`}>
+                    Sí
+                  </button>
+                  <button onClick={() => setForm(f => ({ ...f, elegible_recontratacion: false }))}
+                    className={`px-3 py-1.5 rounded-lg text-sm border ${form.elegible_recontratacion === false ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-200 text-gray-600'}`}>
+                    No
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 flex gap-3 justify-end">
+              <button onClick={() => setSelected(null)} className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                className="px-5 py-2 text-sm font-semibold rounded-lg text-white transition-all disabled:opacity-50"
+                style={{ background: ACCENT }}>
+                {saving ? 'Guardando...' : 'Cerrar offboarding'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg z-50">
+          {toastMsg}
+        </div>
+      )}
+    </div>
+  )
+}
+function TabuladorPage() {
+  const exportTabulador = () => {
+    exportWorkbook('tabulador_puestos.xlsx', [
+      {
+        name: 'Tabulador',
+        rows: TABULADOR.map(item => ({
+          nivel: item.n,
+          familia: item.f,
+          referencia: item.ref,
+        })),
+      },
+    ])
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-6 max-w-lg text-gray-500 text-sm">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="font-serif text-base font-bold text-gray-800">Tabulador actual</div>
+        <button onClick={exportTabulador} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">
+          Descargar Excel
+        </button>
+      </div>
+      MÃ³dulo de tabulador â€” conecta con la tabla <code className="bg-gray-100 px-1.5 rounded text-xs">tabulador</code> en Supabase.<br />
+      Importa tu tabulador desde <span className="font-semibold text-gray-700">Importar datos</span>.
+    </div>
+  )
+}
+
+// â”€â”€â”€ MAIN COMPONENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 export default function Admin() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Login state â€” todos los hooks al nivel superior (no dentro de condicionales)
+  const [loginStep, setLoginStep] = useState('email') // 'email' | 'password' | 'forgot' | 'reset' | 'pending'
+  const [loginEmail, setLoginEmail] = useState('')
+  const [loginPass, setLoginPass] = useState('')
+  const [loginPassConfirm, setLoginPassConfirm] = useState('')
+  const [loginErr, setLoginErr] = useState('')
+  const [loginMsg, setLoginMsg] = useState('')
+
+  // App state
   const [user, setUser] = useState(null)
   const [page, setPage] = useState('dashboard')
+  const [dashTab, setDashTab] = useState('personal')
   const [empleados, setEmpleados] = useState([])
-  const [accessReqs, setAccessReqs] = useState([])
+  const [offboardingPendientes, setOffboardingPendientes] = useState([])
+  const [pendingAdmins, setPendingAdmins] = useState([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState('')
-
-  // Import state
   const [importTab, setImportTab] = useState('master')
   const [importData, setImportData] = useState(null)
   const [importLog, setImportLog] = useState(null)
   const [importing, setImporting] = useState(false)
 
-  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
+  const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   useEffect(() => {
-    if (user && page === 'master') loadEmpleados()
-    if (user && page === 'accesos') loadAccess()
+    if (!user) return
+    loadEmpleados()
+    loadOffboardingPendientes()
+  }, [user])
+
+  useEffect(() => {
+    const resetToken = searchParams.get('reset')
+    if (!resetToken || user) return
+
+    const loadReset = async () => {
+      try {
+        const result = await adminAuth('lookup_reset', { token: resetToken })
+        setLoginEmail(result.email || '')
+        setLoginStep('reset')
+        setLoginErr('')
+      } catch (e) {
+        setLoginErr(e.code === 'expired_token' ? 'El enlace de recuperación expiró.' : 'El enlace de recuperación no es válido.')
+        setLoginStep('email')
+      }
+    }
+
+    loadReset()
+  }, [searchParams, user])
+
+  useEffect(() => {
+    if (!user || page !== 'dashboard') return
+    loadPendingAdmins()
   }, [user, page])
 
   const loadEmpleados = async () => {
     setLoading(true)
-    try { const data = await getEmpleados({ search, status: statusFilter }); setEmpleados(data) }
-    catch (e) { showToast('Error al cargar empleados') }
+    try { setEmpleados(await getEmpleados({})) }
+    catch { showToast('Error al cargar empleados') }
     finally { setLoading(false) }
   }
 
-  const loadAccess = async () => {
-    try { const data = await getAccessRequests(); setAccessReqs(data) }
-    catch (e) { console.error(e) }
+  const loadPendingAdmins = async () => {
+    try {
+      const { data } = await supabase.from('solicitudes_admin').select('*').eq('status', 'pending').order('requested_at', { ascending: false })
+      setPendingAdmins(data || [])
+    } catch { /* tabla puede no existir aÃºn */ }
   }
 
-  const handleApproveAccess = async (id) => {
-    await approveAccess(id, user.name)
-    showToast('✓ Acceso aprobado')
-    loadAccess()
+  const loadOffboardingPendientes = async () => {
+    try { setOffboardingPendientes(await getEntrevistasSalidaPendientes()) }
+    catch { setOffboardingPendientes([]) }
   }
 
-  // ── LOGIN ─────────────────────────────────────────────────
-  if (!user) {
-    const [loginEmail, setLoginEmail] = useState('')
-    const [loginPass, setLoginPass] = useState('')
-    const [loginErr, setLoginErr] = useState('')
-    const doLogin = () => {
-      const u = ADMIN_USERS.find(u => u.email.toLowerCase() === loginEmail.toLowerCase() && u.pass === loginPass)
-      if (!u) { setLoginErr('Correo o contraseña incorrectos'); return }
-      setUser(u)
+  const approveAdminRequest = async (id, email) => {
+    const normalizedEmail = email.trim().toLowerCase()
+    const { data: existing } = await supabase
+      .from('staff_rh')
+      .select('*')
+      .eq('email', normalizedEmail)
+      .maybeSingle()
+
+    if (existing) {
+      await supabase
+        .from('staff_rh')
+        .update({
+          status: 'Activo',
+          approved_at: new Date().toISOString(),
+          aprobado_por: user.id || null,
+        })
+        .eq('id', existing.id)
+    } else {
+      await supabase.from('staff_rh').insert({
+        nombre_completo: normalizedEmail,
+        email: normalizedEmail,
+        rol: 'Admin',
+        status: 'Activo',
+        approved_at: new Date().toISOString(),
+        aprobado_por: user.id || null,
+      })
     }
-    return (
-      <div className="min-h-screen bg-brand flex items-center justify-center p-6">
+
+    await supabase
+      .from('solicitudes_admin')
+      .update({ status: 'approved', approved_by: user.name, approved_at: new Date().toISOString() })
+      .eq('id', id)
+
+    showToast(`Acceso aprobado para ${email}`)
+    loadPendingAdmins()
+  }
+
+  // â”€â”€ COMPUTED STATS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  const stats = useMemo(() => {
+    if (!empleados.length) return null
+    const now = new Date()
+    const currentYear = now.getFullYear()
+
+    const activos = empleados.filter(e => e.status === 'Activo')
+    const onboarding = empleados.filter(e => e.status === 'Onboarding')
+    const offboarding = empleados.filter(e => e.status === 'Offboarding')
+    const inactivos = empleados.filter(e => e.status === 'Inactivo')
+    const activos_ob = [...activos, ...onboarding]
+    const total = empleados.length
+
+    const pctIngr2025 = total ? Math.round(empleados.filter(e => e.fecha_ingreso?.startsWith('2025')).length / total * 100) : 0
+    const pctIngr2026 = total ? +(empleados.filter(e => e.fecha_ingreso?.startsWith('2026')).length / total * 100).toFixed(2) : 0
+
+    const avgArr = (arr, fn) => {
+      const vals = arr.map(fn).filter(v => v > 0)
+      return vals.length ? +(vals.reduce((a,b) => a+b, 0) / vals.length).toFixed(1) : 0
+    }
+    const avgAntig = avgArr(activos, e => yrsDiff(e.fecha_ingreso))
+    const avgEdad = avgArr(activos, e => yrsDiff(e.fecha_nac))
+    const menos6m = activos.filter(e => e.fecha_ingreso && yrsDiff(e.fecha_ingreso) < 0.5).length
+    const mas6m = activos.length - menos6m
+
+    // Generaciones
+    const genPct = [0,0,0,0]
+    activos.forEach(e => {
+      if (!e.fecha_nac) return
+      const y = new Date(e.fecha_nac).getFullYear()
+      if (y >= 1994) genPct[0]++
+      else if (y >= 1981) genPct[1]++
+      else if (y >= 1969) genPct[2]++
+      else genPct[3]++
+    })
+    const genTotal = genPct.reduce((a,b) => a+b, 1)
+    const genPctFinal = genPct.map(n => +(n / genTotal * 100).toFixed(1))
+
+    // GÃ©nero, UEN, Departamento
+    const countBy = (arr, key) => {
+      const m = {}
+      arr.forEach(e => { if (e[key]) m[e[key]] = (m[e[key]] || 0) + 1 })
+      return m
+    }
+    const generoMap = countBy(activos, 'genero')
+    const uenMap = countBy(activos_ob, 'uen')
+    const deptMap = countBy(activos, 'departamento')
+
+    // AntigÃ¼edad buckets
+    const antigMap = { '< 1 aÃ±o': 0, '1-2 aÃ±os': 0, '2-3 aÃ±os': 0, '3-5 aÃ±os': 0, '5+ aÃ±os': 0 }
+    activos.forEach(e => {
+      const y = yrsDiff(e.fecha_ingreso)
+      if (y < 1) antigMap['< 1 aÃ±o']++
+      else if (y < 2) antigMap['1-2 aÃ±os']++
+      else if (y < 3) antigMap['2-3 aÃ±os']++
+      else if (y < 5) antigMap['3-5 aÃ±os']++
+      else antigMap['5+ aÃ±os']++
+    })
+
+    // Finanzas
+    const costoTotal = activos_ob.reduce((s,e) => s+(e.costo_real_mens||0), 0)
+    const costoAnual = activos_ob.reduce((s,e) => s+(e.costo_real_anual||0), 0)
+    const promCosto = activos.length ? costoTotal / activos.length : 0
+    const distPct = costoTotal ? [
+      { l: 'Sueldo base', v: Math.round(activos_ob.reduce((s,e)=>s+(e.sueldo_bruto||0),0)/costoTotal*100) },
+      { l: 'Despensa', v: Math.round(activos_ob.reduce((s,e)=>s+(e.despensa||0),0)/costoTotal*100) },
+      { l: 'Fondo ahorro', v: Math.round(activos_ob.reduce((s,e)=>s+(e.fondo_ahorro||0),0)/costoTotal*100) },
+      { l: 'Gasolina', v: Math.round(activos_ob.reduce((s,e)=>s+(e.gasolina||0),0)/costoTotal*100) },
+      { l: 'Prima vac.', v: Math.round(activos_ob.reduce((s,e)=>s+(e.prima_vacacional||0),0)/costoTotal*100) },
+      { l: 'Celular', v: Math.round(activos_ob.reduce((s,e)=>s+(e.monto_celular||0),0)/costoTotal*100) },
+      { l: 'SGMM', v: Math.round(activos_ob.reduce((s,e)=>s+(e.sgmm||0),0)/costoTotal*100) },
+      { l: 'Seg. vida', v: Math.round(activos_ob.reduce((s,e)=>s+(e.seguro_vida||0),0)/costoTotal*100) },
+    ].filter(d => d.v > 0) : []
+
+    // Attrition
+    const bajasAnio = inactivos.filter(e => e.fecha_termino?.startsWith(String(currentYear))).length
+    const tasaRot = activos.length ? +((bajasAnio / (activos.length + bajasAnio)) * 100).toFixed(1) : 0
+    const antigSalidaVals = inactivos.filter(e => e.fecha_ingreso && e.fecha_termino)
+      .map(e => (new Date(e.fecha_termino) - new Date(e.fecha_ingreso)) / (1000*60*60*24*365.25))
+    const avgAntigSalida = antigSalidaVals.length
+      ? +(antigSalidaVals.reduce((a,b)=>a+b,0)/antigSalidaVals.length).toFixed(1) : 0
+
+    const motivoMap = countBy(inactivos, 'razon_termino')
+    const bajasMes = Array(12).fill(0)
+    inactivos.filter(e => e.fecha_termino?.startsWith(String(currentYear)))
+      .forEach(e => bajasMes[new Date(e.fecha_termino).getMonth()]++)
+    const bajasDeptMap = countBy(inactivos, 'departamento')
+
+    return {
+      headcount: activos.length, onboarding: onboarding.length, offboarding: offboarding.length, total,
+      pctIngr2025, pctIngr2026, avgAntig, avgEdad, menos6m, mas6m,
+      genPct: genPctFinal, generoMap, uenMap, deptMap, antigMap,
+      costoTotal, costoAnual, promCosto, distPct,
+      bajasAnio, tasaRot, avgAntigSalida, motivoMap, bajasMes, bajasDeptMap,
+      activos_ob_list: activos_ob, inactivos_list: inactivos,
+    }
+  }, [empleados])
+
+  // â”€â”€ LOGIN HANDLERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  const handleEmailContinue = async () => {
+    setLoginErr('')
+    setLoginMsg('')
+    const email = loginEmail.trim().toLowerCase()
+    if (!email) { setLoginErr('Ingresa tu correo corporativo'); return }
+
+    try {
+      await adminAuth('lookup_email', { email })
+      setLoginStep('password')
+    } catch (e) {
+      if (e.code !== 'invalid_email') {
+        setLoginErr('No fue posible validar tu acceso')
+        return
+      }
+      supabase.from('solicitudes_admin').insert({ email, status: 'pending' }).catch(console.error)
+      setLoginStep('pending')
+    }
+  }
+
+  const handlePasswordLogin = async () => {
+    setLoginErr('')
+    setLoginMsg('')
+    try {
+      const { user: authUser } = await adminAuth('login', { email: loginEmail, password: loginPass })
+      setUser({
+        ...authUser,
+        initials: (authUser.name || authUser.email).split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('') || 'RH',
+      })
+    } catch (e) {
+      if (e.code === 'password_not_set') setLoginErr('Tu cuenta aún no tiene contraseña. Usa "Olvidé contraseña".')
+      else if (e.code === 'invalid_password') setLoginErr('Contraseña incorrecta')
+      else setLoginErr('No encontramos tu acceso')
+    }
+  }
+
+  const handleForgotPassword = async () => {
+    setLoginErr('')
+    setLoginMsg('')
+    if (!loginEmail.trim()) { setLoginErr('Ingresa tu correo corporativo'); return }
+    try {
+      await adminAuth('request_reset', { email: loginEmail })
+      setLoginMsg('Te enviamos un enlace para restablecer tu contraseña.')
+    } catch (e) {
+      setLoginErr(e.code === 'invalid_email' ? 'No encontramos ese correo.' : 'No fue posible enviar el enlace.')
+    }
+  }
+
+  const handleResetPassword = async () => {
+    const resetToken = searchParams.get('reset')
+    setLoginErr('')
+    if (!loginPass || loginPass.length < 8) { setLoginErr('La contraseña debe tener al menos 8 caracteres'); return }
+    if (loginPass !== loginPassConfirm) { setLoginErr('Las contraseñas no coinciden'); return }
+    try {
+      await adminAuth('reset_password', { token: resetToken, password: loginPass })
+      setLoginStep('password')
+      setLoginPass('')
+      setLoginPassConfirm('')
+      setLoginMsg('Tu contraseña se actualizó. Ya puedes iniciar sesión.')
+      setSearchParams({})
+    } catch (e) {
+      setLoginErr(e.code === 'expired_token' ? 'El enlace de recuperación expiró.' : 'No fue posible actualizar la contraseña.')
+    }
+  }
+
+  // â”€â”€ LOGIN SCREENS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  if (!user) {
+    const brandBg = { background: BRAND }
+    const inputCls = "px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 w-full"
+    const btnPrimary = "w-full py-2.5 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
+
+    if (loginStep === 'email') return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div className="bg-brand px-8 pt-8 pb-6 text-center">
+          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
             <div className="font-serif text-white text-2xl font-bold">Areya</div>
-            <div className="text-white/50 text-sm mt-1">Panel de Recursos Humanos</div>
+            <div className="text-white/50 text-sm mt-1">Panel de administraciÃ³n Â· RRHH</div>
           </div>
           <div className="px-8 py-7 flex flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Correo</label>
-              <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Correo corporativo</label>
+              <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoFocus
                 placeholder="tu.nombre@areya.com.mx"
-                className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Contraseña</label>
-              <input type="password" value={loginPass} onChange={e => setLoginPass(e.target.value)}
-                className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent"
-                onKeyDown={e => e.key === 'Enter' && doLogin()} />
+                onKeyDown={e => e.key === 'Enter' && handleEmailContinue()}
+                className={inputCls} />
             </div>
             {loginErr && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{loginErr}</div>}
-            <button onClick={doLogin} className="btn-primary w-full py-2.5">Entrar</button>
-            <div className="text-xs text-gray-400 text-center">demo / demo para acceso de prueba</div>
+            {loginMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{loginMsg}</div>}
+            <button onClick={handleEmailContinue} disabled={!loginEmail.trim()}
+              className={btnPrimary} style={{ background: ACCENT }}>
+              Continuar â†’
+            </button>
           </div>
+        </div>
+      </div>
+    )
+
+    if (loginStep === 'password') return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
+            <div className="font-serif text-white text-2xl font-bold">Areya</div>
+            <div className="text-white/50 text-sm mt-1">Panel de administraciÃ³n Â· RRHH</div>
+          </div>
+          <div className="px-8 py-7 flex flex-col gap-4">
+            <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2.5">
+              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+                {loginEmail[0]?.toUpperCase() || '?'}
+              </div>
+              <span className="text-sm text-gray-700 flex-1 truncate">{loginEmail}</span>
+              <button onClick={() => { setLoginStep('email'); setLoginPass(''); setLoginErr('') }}
+                className="text-xs font-medium hover:underline flex-shrink-0" style={{ color: ACCENT }}>
+                Cambiar
+              </button>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">ContraseÃ±a</label>
+              <input type="password" value={loginPass} onChange={e => setLoginPass(e.target.value)} autoFocus
+                onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
+                className={inputCls} />
+            </div>
+            {loginErr && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{loginErr}</div>}
+            {loginMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{loginMsg}</div>}
+            <button onClick={handlePasswordLogin} disabled={!loginPass}
+              className={btnPrimary} style={{ background: ACCENT }}>
+              Entrar al panel
+            </button>
+            <button onClick={() => { setLoginStep('forgot'); setLoginErr(''); setLoginMsg('') }}
+              className="text-xs font-medium hover:underline text-left" style={{ color: ACCENT }}>
+              {'Olvid\u00e9 contrase\u00f1a'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+
+    if (loginStep === 'forgot') return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
+            <div className="font-serif text-white text-2xl font-bold">Areya</div>
+            <div className="text-white/50 text-sm mt-1">Recuperar acceso al panel</div>
+          </div>
+          <div className="px-8 py-7 flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Correo corporativo</label>
+              <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleForgotPassword()}
+                className={inputCls} />
+            </div>
+            {loginErr && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{loginErr}</div>}
+            {loginMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{loginMsg}</div>}
+            <button onClick={handleForgotPassword} disabled={!loginEmail.trim()}
+              className={btnPrimary} style={{ background: ACCENT }}>
+              Enviar enlace
+            </button>
+            <button onClick={() => { setLoginStep('password'); setLoginErr(''); setLoginMsg('') }}
+              className="text-xs font-medium hover:underline text-left" style={{ color: ACCENT }}>
+              Volver al inicio de sesiÃ³n
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+
+    if (loginStep === 'reset') return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
+            <div className="font-serif text-white text-2xl font-bold">Areya</div>
+            <div className="text-white/50 text-sm mt-1">Restablecer contraseÃ±a</div>
+          </div>
+          <div className="px-8 py-7 flex flex-col gap-4">
+            <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-700 font-mono">{loginEmail}</div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nueva contraseÃ±a</label>
+              <input type="password" value={loginPass} onChange={e => setLoginPass(e.target.value)} autoFocus className={inputCls} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Confirmar contraseÃ±a</label>
+              <input type="password" value={loginPassConfirm} onChange={e => setLoginPassConfirm(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleResetPassword()}
+                className={inputCls} />
+            </div>
+            {loginErr && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{loginErr}</div>}
+            <button onClick={handleResetPassword} disabled={!loginPass || !loginPassConfirm}
+              className={btnPrimary} style={{ background: ACCENT }}>
+              Guardar nueva contraseÃ±a
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+
+    // Pending
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
+        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-sm w-full text-center">
+          <div className="text-4xl mb-4">â³</div>
+          <h2 className="font-serif text-xl font-bold mb-2" style={{ color: BRAND }}>Acceso pendiente</h2>
+          <p className="text-gray-500 text-sm leading-relaxed mb-5">
+            Tu solicitud fue enviada al equipo de RRHH. Cuando sea aprobada, recibirÃ¡s un correo en{' '}
+            <strong className="text-gray-700">{loginEmail}</strong> para crear tu contraseÃ±a.
+          </p>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 mb-5">
+            Tiempo de respuesta habitual: menos de 24 horas
+          </div>
+          <button onClick={() => { setLoginStep('email'); setLoginEmail(''); setLoginErr('') }}
+            className="text-sm font-medium hover:underline" style={{ color: ACCENT }}>
+            â† Usar otro correo
+          </button>
         </div>
       </div>
     )
   }
 
-  // ── IMPORT LOGIC ──────────────────────────────────────────
+  // â”€â”€ IMPORT LOGIC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   const processFile = (file, type) => {
     const reader = new FileReader()
     reader.onload = e => {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
-      if (!rows.length) { showToast('⚠ El archivo está vacío'); return }
+      if (!rows.length) { showToast('âš  El archivo estÃ¡ vacÃ­o'); return }
       setImportData({ rows, fileName: file.name, type })
       setImportLog(null)
     }
@@ -153,43 +1692,31 @@ export default function Admin() {
     const { rows, type } = importData
     const colMap = type === 'master' ? MASTER_COL_MAP : TAREAS_COL_MAP
     let inserted = 0, updated = 0, skipped = 0, lines = []
-
     for (let i = 0; i < rows.length; i++) {
       const mapped = mapRow(rows[i], colMap)
       const keyCol = type === 'master' ? 'id_colaborador' : 'titulo'
-      if (!mapped[keyCol]) { skipped++; lines.push(`⚠ Fila ${i+2}: sin ${keyCol}, omitida`); continue }
-      if (type === 'tareas' && !mapped.nivel) { skipped++; lines.push(`⚠ Fila ${i+2}: sin nivel, omitida`); continue }
-
+      if (!mapped[keyCol]) { skipped++; lines.push(`âš  Fila ${i+2}: sin ${keyCol}`); continue }
       try {
         if (type === 'master') {
-          const { data: existing } = await supabase.from('empleados').select('id').eq('id_colaborador', mapped.id_colaborador).single()
-          if (existing) {
-            await updateEmpleado(existing.id, mapped)
-            updated++; lines.push(`✓ Actualizado: ${mapped.id_colaborador}`)
-          } else {
-            await supabase.from('empleados').insert(mapped)
-            inserted++; lines.push(`+ Insertado: ${mapped.id_colaborador}`)
-          }
+          const { data: ex } = await supabase.from('empleados').select('id').eq('id_colaborador', mapped.id_colaborador).single()
+          if (ex) { await updateEmpleado(ex.id, mapped); updated++; lines.push(`âœ“ Actualizado: ${mapped.id_colaborador}`) }
+          else { await supabase.from('empleados').insert(mapped); inserted++; lines.push(`+ Insertado: ${mapped.id_colaborador}`) }
         } else {
-          await upsertTemplate(mapped)
-          inserted++; lines.push(`✓ Tarea: ${mapped.titulo} (${mapped.nivel})`)
+          await upsertTemplate(mapped); inserted++; lines.push(`âœ“ Tarea: ${mapped.titulo} (${mapped.nivel})`)
         }
-      } catch (err) {
-        skipped++; lines.push(`✗ Fila ${i+2}: ${err.message?.slice(0, 60)}`)
-      }
+      } catch (err) { skipped++; lines.push(`âœ— Fila ${i+2}: ${err.message?.slice(0,60)}`) }
     }
-
     setImportLog({ inserted, updated, skipped, lines })
     setImporting(false)
-    showToast(`✓ Importación completa — ${inserted} nuevos · ${updated} actualizados`)
+    showToast(`âœ“ ImportaciÃ³n completa â€” ${inserted} nuevos Â· ${updated} actualizados`)
     if (type === 'master') loadEmpleados()
   }
 
   const downloadTemplate = () => {
     const data = [
       { nivel: 'Practicante', categoria: 'Previo al ingreso', titulo: 'Firma de contrato', descripcion: '', orden: 1 },
-      { nivel: 'Analista', categoria: 'Inducción', titulo: 'Reunión con el equipo', descripcion: '', orden: 1 },
-      { nivel: 'todos', categoria: 'Políticas', titulo: 'Código de conducta', descripcion: '', orden: 1 },
+      { nivel: 'Analista', categoria: 'InducciÃ³n', titulo: 'ReuniÃ³n con el equipo', descripcion: '', orden: 1 },
+      { nivel: 'todos', categoria: 'PolÃ­ticas', titulo: 'CÃ³digo de conducta', descripcion: '', orden: 1 },
     ]
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
@@ -197,278 +1724,120 @@ export default function Admin() {
     XLSX.writeFile(wb, 'plantilla_tareas_onboarding.xlsx')
   }
 
-  // ── SIDEBAR ITEMS ─────────────────────────────────────────
+  // â”€â”€ MAIN RENDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   const navItems = [
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'master', label: 'Master de empleados' },
+    { id: 'master', label: 'Master empleados' },
+    { id: 'tabulador', label: 'Tabulador' },
     { id: 'onboarding', label: 'Onboarding' },
-    { id: 'accesos', label: `Accesos ${accessReqs.length ? `(${accessReqs.length})` : ''}` },
+    { id: 'offboarding', label: 'Offboarding' },
     { id: 'importar', label: 'Importar datos' },
   ]
+
+  const pageTitle = {
+    dashboard: 'Dashboard',
+    master: 'Master de empleados',
+    tabulador: 'Tabulador de puestos',
+    onboarding: 'Onboarding',
+    offboarding: 'Offboarding',
+    importar: 'Importar datos',
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Sidebar */}
-      <div className="w-52 bg-brand flex flex-col flex-shrink-0">
-        <div className="px-5 pt-5 pb-4 border-b border-white/10">
+      <div className="w-52 flex flex-col flex-shrink-0" style={{ background: BRAND }}>
+        <div className="px-5 pt-5 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,.08)' }}>
           <div className="font-serif text-white text-lg font-bold">Areya</div>
-          <div className="text-white/40 text-xs mt-0.5">Sistema de RRHH</div>
+          <div className="text-xs mt-0.5" style={{ color: 'rgba(255,255,255,.35)' }}>Sistema de RRHH</div>
         </div>
         <nav className="flex-1 py-3">
           {navItems.map(item => (
             <button key={item.id} onClick={() => setPage(item.id)}
-              className={`w-full text-left px-5 py-2.5 text-sm font-medium transition-all border-l-2
-                ${page === item.id ? 'bg-indigo-500/25 text-white border-accent' : 'text-white/55 border-transparent hover:bg-white/5 hover:text-white/90'}`}>
+              className="w-full text-left px-5 py-2.5 text-sm font-medium transition-all border-l-2 flex items-center gap-2"
+              style={{
+                color: page === item.id ? '#fff' : 'rgba(255,255,255,.55)',
+                background: page === item.id ? 'rgba(79,70,229,.25)' : 'transparent',
+                borderLeftColor: page === item.id ? ACCENT : 'transparent',
+              }}>
               {item.label}
+              {item.id === 'onboarding' && empleados.filter(e => e.status === 'Onboarding').length > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full leading-none">
+                  {empleados.filter(e => e.status === 'Onboarding').length}
+                </span>
+              )}
+              {item.id === 'offboarding' && offboardingPendientes.length > 0 && (
+                <span className="ml-auto bg-amber-500 text-white text-xs px-1.5 py-0.5 rounded-full leading-none">
+                  {offboardingPendientes.length}
+                </span>
+              )}
             </button>
           ))}
         </nav>
-        <div className="px-5 py-4 border-t border-white/10 flex items-center gap-2">
-          <div className="w-7 h-7 rounded-full bg-accent flex items-center justify-center text-white text-xs font-bold flex-shrink-0">{user.initials}</div>
+        <div className="px-5 py-4 flex items-center gap-2" style={{ borderTop: '1px solid rgba(255,255,255,.08)' }}>
+          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: ACCENT }}>
+            {user.initials}
+          </div>
           <div>
             <div className="text-white text-xs font-semibold">{user.name}</div>
-            <div className="text-white/40 text-xs">{user.rol}</div>
+            <div className="text-xs" style={{ color: 'rgba(255,255,255,.35)' }}>{user.rol}</div>
           </div>
         </div>
       </div>
 
       {/* Main */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Topbar */}
-        <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-6 h-13 flex items-center justify-between">
-          <div className="font-serif text-base font-bold capitalize">{page.replace('master', 'Master de empleados').replace('importar', 'Importar datos').replace('accesos', 'Gestión de accesos').replace('onboarding', 'Onboarding').replace('dashboard', 'Dashboard')}</div>
+      <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-6 h-13 flex items-center justify-between flex-shrink-0" style={{ minHeight: 52 }}>
+          <div className="font-serif text-base font-bold">{pageTitle[page] || page}</div>
+          {loading && <div className="text-xs text-gray-400">Cargando...</div>}
         </div>
 
-        <div className="p-6">
-
-          {/* ── DASHBOARD ── */}
+        <div className="p-6 flex-1">
           {page === 'dashboard' && (
-            <div>
-              <div className="grid grid-cols-4 gap-4 mb-6">
-                {[
-                  { n: empleados.filter(e => e.status === 'Activo').length || '—', l: 'Colaboradores activos', c: 'text-accent' },
-                  { n: empleados.filter(e => e.status === 'Onboarding').length || '—', l: 'En onboarding', c: 'text-emerald-600' },
-                  { n: accessReqs.length || '—', l: 'Accesos pendientes', c: 'text-amber-600' },
-                  { n: empleados.filter(e => e.status === 'Offboarding').length || '—', l: 'En offboarding', c: 'text-red-500' },
-                ].map((s, i) => (
-                  <div key={i} className="card">
-                    <div className={`font-serif text-3xl font-bold ${s.c}`}>{s.n}</div>
-                    <div className="text-gray-500 text-sm mt-1">{s.l}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="card">
-                <div className="font-serif text-sm font-bold mb-3">Accesos de acceso pendientes de aprobar</div>
-                {accessReqs.length === 0
-                  ? <div className="text-gray-400 text-sm">No hay solicitudes pendientes ✓</div>
-                  : accessReqs.slice(0, 3).map(r => (
-                    <div key={r.id} className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0">
-                      <div>
-                        <div className="text-sm font-semibold">{r.empleados?.nombre_completo || r.email}</div>
-                        <div className="text-xs text-gray-400">{r.email}</div>
-                      </div>
-                      <button onClick={() => handleApproveAccess(r.id)} className="btn-primary text-xs px-3 py-1.5">Aprobar</button>
-                    </div>
-                  ))
-                }
-              </div>
-            </div>
+            <DashboardPage
+              stats={stats}
+              empleados={empleados}
+              pendingAdmins={pendingAdmins}
+              onApproveAdmin={approveAdminRequest}
+              dashTab={dashTab}
+              setDashTab={setDashTab}
+            />
           )}
-
-          {/* ── MASTER ── */}
           {page === 'master' && (
-            <div>
-              <div className="flex gap-3 mb-4 flex-wrap">
-                <input type="text" placeholder="Buscar nombre, RFC, email..." value={search}
-                  onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && loadEmpleados()}
-                  className="flex-1 min-w-48 px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent" />
-                <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); }}
-                  className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none bg-white">
-                  <option value="">Todos los estatus</option>
-                  {['Activo','Onboarding','Offboarding','Inactivo'].map(s => <option key={s}>{s}</option>)}
-                </select>
-                <button onClick={loadEmpleados} className="btn-primary px-4">Buscar</button>
-              </div>
-              <div className="card p-0 overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100">
-                        {['ID', 'Nombre', 'RFC', 'Departamento', 'Cargo', 'Email', 'Ingreso', 'Status'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loading && <tr><td colSpan={8} className="text-center py-8 text-gray-400">Cargando...</td></tr>}
-                      {!loading && empleados.length === 0 && (
-                        <tr><td colSpan={8} className="text-center py-8 text-gray-400">No hay registros. Importa el master para comenzar.</td></tr>
-                      )}
-                      {empleados.map(e => (
-                        <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-xs text-gray-400 font-mono">{e.id_colaborador}</td>
-                          <td className="px-4 py-3 font-semibold text-accent whitespace-nowrap">{e.nombre_completo}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{e.rfc || '—'}</td>
-                          <td className="px-4 py-3 text-gray-600">{e.departamento || '—'}</td>
-                          <td className="px-4 py-3 text-gray-600 max-w-36 truncate">{e.cargo || '—'}</td>
-                          <td className="px-4 py-3 font-mono text-xs text-indigo-600">{e.email_corporativo || '—'}</td>
-                          <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                            {e.fecha_ingreso ? new Date(e.fecha_ingreso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className={STATUS_BADGE[e.status] || 'badge-inactive'}>{e.status}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="px-4 py-2 text-xs text-gray-400 border-t border-gray-100">
-                  {empleados.length} colaboradores
-                </div>
-              </div>
-            </div>
+            <MasterTable
+              empleados={empleados}
+              search={search} setSearch={setSearch}
+              statusFilter={statusFilter} setStatusFilter={setStatusFilter}
+              loading={loading}
+              onLoad={loadEmpleados}
+              showToast={showToast}
+            />
           )}
-
-          {/* ── ACCESOS ── */}
-          {page === 'accesos' && (
-            <div className="max-w-xl">
-              <div className="card mb-4">
-                <div className="font-serif text-sm font-bold mb-3">Solicitudes pendientes <span className="bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded-full ml-1">{accessReqs.length}</span></div>
-                {accessReqs.length === 0
-                  ? <div className="text-gray-400 text-sm py-4 text-center">No hay solicitudes pendientes ✓</div>
-                  : accessReqs.map(r => (
-                    <div key={r.id} className="border border-amber-200 bg-amber-50 rounded-xl p-4 mb-3">
-                      <div className="font-semibold text-sm">{r.empleados?.nombre_completo || '—'}</div>
-                      <div className="text-xs text-gray-500 mb-1">{r.empleados?.departamento || '—'}</div>
-                      <div className="font-mono text-sm text-indigo-700 bg-white border border-indigo-100 rounded-lg px-3 py-2 mb-3">{r.email}</div>
-                      <div className="text-xs text-gray-400 mb-3">
-                        Al aprobar, Supabase enviará un magic link al correo corporativo del colaborador.
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => handleApproveAccess(r.id)} className="flex-1 btn-primary text-sm py-2">✓ Aprobar y enviar magic link</button>
-                        <button className="btn-ghost text-sm py-2">Rechazar</button>
-                      </div>
-                    </div>
-                  ))
-                }
-              </div>
-            </div>
-          )}
-
-          {/* ── IMPORTAR ── */}
+          {page === 'tabulador' && <TabuladorPage />}
+          {page === 'onboarding' && <OnboardingPageAdmin empleados={empleados} onLoad={loadEmpleados} />}
+          {page === 'offboarding' && <OffboardingPageAdmin entrevistas={offboardingPendientes} onComplete={() => { loadEmpleados(); loadOffboardingPendientes() }} />}
           {page === 'importar' && (
-            <div className="max-w-2xl">
-              {/* Tabs */}
-              <div className="flex gap-2 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
-                {['master', 'tareas'].map(t => (
-                  <button key={t} onClick={() => { setImportTab(t); setImportData(null); setImportLog(null) }}
-                    className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${importTab === t ? 'bg-white text-brand shadow-sm font-semibold' : 'text-gray-500 hover:text-gray-700'}`}>
-                    {t === 'master' ? 'Master de empleados' : 'Plantilla de tareas'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Info */}
-              <div className={`card mb-4 border-l-4 ${importTab === 'master' ? 'border-accent' : 'border-purple-500'}`}>
-                {importTab === 'master' ? (
-                  <div className="text-sm text-gray-600 leading-relaxed">
-                    <strong className="text-gray-800">Columna siempre requerida:</strong> <code className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-xs">ID Colaborador</code><br />
-                    <span className="text-xs text-gray-500 mt-1 block">Carga completa: trae todas las columnas. Actualización parcial: ID Colaborador + columnas a cambiar. Celdas vacías → null.</span>
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-600 leading-relaxed">
-                    Columnas: <code className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-xs">nivel</code> <code className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-xs">categoria</code> <code className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-xs">titulo</code> <code className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-xs">descripcion</code> <code className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-xs">orden</code><br />
-                    <button onClick={downloadTemplate} className="text-xs text-purple-600 underline mt-1">⬇ Descargar plantilla de ejemplo</button>
-                  </div>
-                )}
-              </div>
-
-              {/* Drop zone */}
-              {!importData && !importLog && (
-                <label className="block border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-accent hover:bg-indigo-50/50 transition-all">
-                  <div className="text-3xl mb-3">📂</div>
-                  <div className="text-sm font-semibold text-gray-700 mb-1">Arrastra o haz clic para subir</div>
-                  <div className="text-xs text-gray-400">.xlsx · .xls · .csv</div>
-                  <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={e => e.target.files[0] && processFile(e.target.files[0], importTab)} />
-                </label>
-              )}
-
-              {/* Preview */}
-              {importData && !importLog && (
-                <div className="card">
-                  <div className="font-serif text-sm font-bold mb-3">{importData.fileName}</div>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {[
-                      { n: importData.rows.length, l: 'Total filas' },
-                      { n: Object.keys(importData.rows[0]).length, l: 'Columnas' },
-                      { n: importData.type === 'master' ? 'UPSERT' : 'Tareas', l: 'Modo' },
-                    ].map((s, i) => (
-                      <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
-                        <div className="font-serif text-xl font-bold text-accent">{s.n}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">{s.l}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {/* 5 row preview */}
-                  <div className="overflow-x-auto rounded-lg border border-gray-100 mb-4">
-                    <table className="text-xs w-full border-collapse">
-                      <thead><tr className="bg-gray-50">{Object.keys(importData.rows[0]).map(h => <th key={h} className="px-3 py-2 text-left font-bold text-gray-400 whitespace-nowrap border-b border-gray-100">{h}</th>)}</tr></thead>
-                      <tbody>{importData.rows.slice(0, 5).map((r, i) => <tr key={i} className="border-b border-gray-50">{Object.keys(importData.rows[0]).map(h => <td key={h} className="px-3 py-2 whitespace-nowrap max-w-32 truncate">{r[h] ?? ''}</td>)}</tr>)}</tbody>
-                    </table>
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button onClick={() => setImportData(null)} className="btn-ghost">Cancelar</button>
-                    <button onClick={runImport} disabled={importing} className="btn-primary">
-                      {importing ? 'Importando...' : `Importar ${importData.rows.length} filas →`}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Log */}
-              {importLog && (
-                <div className="card">
-                  <div className="font-serif text-sm font-bold mb-3">Resultado</div>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {[
-                      { n: importLog.inserted, l: 'Insertados', c: 'text-accent' },
-                      { n: importLog.updated, l: 'Actualizados', c: 'text-emerald-600' },
-                      { n: importLog.skipped, l: 'Omitidos', c: importLog.skipped ? 'text-red-500' : 'text-gray-400' },
-                    ].map((s, i) => (
-                      <div key={i} className="bg-gray-50 rounded-lg p-3 text-center">
-                        <div className={`font-serif text-2xl font-bold ${s.c}`}>{s.n}</div>
-                        <div className="text-xs text-gray-400 mt-0.5">{s.l}</div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto font-mono text-xs leading-relaxed">
-                    {importLog.lines.map((l, i) => (
-                      <div key={i} className={l.startsWith('✓') || l.startsWith('+') ? 'text-emerald-700' : l.startsWith('⚠') ? 'text-amber-600' : 'text-red-600'}>{l}</div>
-                    ))}
-                  </div>
-                  <button onClick={() => { setImportData(null); setImportLog(null) }} className="btn-ghost mt-3 w-full">Nueva importación</button>
-                </div>
-              )}
-            </div>
+            <ImportPage
+              importTab={importTab} setImportTab={setImportTab}
+              importData={importData} setImportData={setImportData}
+              importLog={importLog} setImportLog={setImportLog}
+              importing={importing}
+              onProcess={processFile}
+              onRun={runImport}
+              onDownloadTemplate={downloadTemplate}
+            />
           )}
-
-          {/* ── ONBOARDING placeholder ── */}
-          {page === 'onboarding' && (
-            <div className="card max-w-lg text-gray-500 text-sm">
-              El módulo de onboarding muestra los empleados activos con su progreso de tareas. Próximamente con datos en tiempo real de Supabase.
-            </div>
-          )}
-
         </div>
       </div>
 
-      {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg z-50 animate-fade-in">
+        <div className="fixed bottom-6 right-6 bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-lg z-50">
           {toast}
         </div>
       )}
     </div>
   )
 }
+
+

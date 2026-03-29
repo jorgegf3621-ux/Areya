@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { insertNuevoIngreso } from '../lib/supabase'
 
 const STEPS = [
   'Datos personales',
@@ -12,8 +12,8 @@ const STEPS = [
 
 const initialForm = {
   // Paso 1 - Datos personales
-  nombre: '', ap_pat: '', ap_mat: '', fecha_nac: '', genero: '', estado_civil: '', nacionalidad: 'Mexicana',
-  tipo_sangre: '', alergias: '', email_personal: '',
+  nombre: '', ap_pat: '', ap_mat: '', fecha_nac: '', genero: '', estado_civil: '',
+  nacionalidad: 'Mexicana', tipo_sangre: '', alergias: '', email_personal: '',
   // Paso 2 - Documentos
   rfc: '', curp: '', nss: '', infonavit: '',
   // Paso 3 - Domicilio
@@ -34,6 +34,7 @@ export default function Formulario() {
   const [error, setError] = useState('')
 
   const set = (field, value) => setForm(f => ({ ...f, [field]: value }))
+
   const inp = (field, label, type = 'text', required = false) => (
     <div className="flex flex-col gap-1">
       <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
@@ -48,6 +49,7 @@ export default function Formulario() {
       />
     </div>
   )
+
   const sel = (field, label, options, required = false) => (
     <div className="flex flex-col gap-1">
       <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
@@ -65,7 +67,7 @@ export default function Formulario() {
 
   const steps = [
     // Paso 0 — Datos personales
-    <div className="grid grid-cols-2 gap-4">
+    <div key="0" className="grid grid-cols-2 gap-4">
       {inp('nombre', 'Nombre(s)', 'text', true)}
       {inp('ap_pat', 'Apellido paterno', 'text', true)}
       {inp('ap_mat', 'Apellido materno')}
@@ -82,7 +84,7 @@ export default function Formulario() {
     </div>,
 
     // Paso 1 — Documentos
-    <div className="grid grid-cols-2 gap-4">
+    <div key="1" className="grid grid-cols-2 gap-4">
       {inp('rfc', 'RFC', 'text', true)}
       {inp('curp', 'CURP', 'text', true)}
       {inp('nss', 'Número de Seguro Social (NSS)', 'text', true)}
@@ -90,7 +92,7 @@ export default function Formulario() {
     </div>,
 
     // Paso 2 — Domicilio
-    <div className="grid grid-cols-2 gap-4">
+    <div key="2" className="grid grid-cols-2 gap-4">
       <div className="col-span-2 flex flex-col gap-1">
         <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Dirección <span className="text-red-500">*</span></label>
         <input type="text" value={form.direccion} onChange={e => set('direccion', e.target.value)}
@@ -102,7 +104,7 @@ export default function Formulario() {
     </div>,
 
     // Paso 3 — Familia
-    <div className="grid grid-cols-2 gap-4">
+    <div key="3" className="grid grid-cols-2 gap-4">
       <div className="col-span-2 text-sm font-semibold text-gray-700 mb-1">Contacto de emergencia</div>
       {inp('contacto_emergencia', 'Nombre completo', 'text', true)}
       {sel('parentesco', 'Parentesco', ['', 'Padre/Madre', 'Esposo/a', 'Hijo/a', 'Hermano/a', 'Otro'])}
@@ -110,7 +112,7 @@ export default function Formulario() {
     </div>,
 
     // Paso 4 — Vehículo
-    <div className="grid grid-cols-2 gap-4">
+    <div key="4" className="grid grid-cols-2 gap-4">
       <div className="col-span-2 flex items-center gap-3">
         <input type="checkbox" id="tiene_vehiculo" checked={form.tiene_vehiculo}
           onChange={e => set('tiene_vehiculo', e.target.checked)}
@@ -129,7 +131,7 @@ export default function Formulario() {
     </div>,
 
     // Paso 5 — Puesto
-    <div className="grid grid-cols-2 gap-4">
+    <div key="5" className="grid grid-cols-2 gap-4">
       {inp('departamento', 'Área / Departamento', 'text', true)}
       {inp('cargo', 'Puesto / Cargo', 'text', true)}
       {sel('tipo_contrato', 'Tipo de contrato', ['Planta', 'Temporal', 'Practicante', 'Por proyecto'])}
@@ -145,12 +147,20 @@ export default function Formulario() {
     setLoading(true)
     setError('')
     try {
-      const { error: err } = await supabase.from('empleados').insert({
-        ...form,
-        status: 'Onboarding',
-        tiene_vehiculo: form.tiene_vehiculo,
-      })
-      if (err) throw err
+      // 1. Crear expediente en empleados y preparar acceso inicial al portal
+      await insertNuevoIngreso(form)
+
+      // 2. Notificar a RRHH por correo
+      try {
+        await fetch('/api/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'notify_rrhh', data: form }),
+        })
+      } catch {
+        // Si falla el correo, no bloqueamos — el registro ya está en Supabase
+      }
+
       setDone(true)
     } catch (e) {
       setError('Ocurrió un error al enviar el formulario. Por favor intenta de nuevo.')
@@ -167,7 +177,7 @@ export default function Formulario() {
         <h1 className="font-serif text-2xl font-bold text-brand mb-3">¡Formulario enviado!</h1>
         <p className="text-gray-500 text-sm leading-relaxed">
           Tu información fue recibida por el equipo de RRHH de Areya.<br /><br />
-          En breve recibirás un correo en <strong>{form.email_personal}</strong> con tu acceso al portal de onboarding.
+          En breve recibirás un correo en <strong>{form.email_personal}</strong> con tu correo corporativo e instrucciones para activar tu acceso al portal de onboarding.
         </p>
       </div>
     </div>
@@ -180,7 +190,6 @@ export default function Formulario() {
         <div className="bg-brand px-8 pt-8 pb-6">
           <div className="font-serif text-white text-2xl font-bold mb-1">Areya</div>
           <div className="text-white/50 text-sm">Formulario de ingreso · Recursos Humanos</div>
-          {/* Progress */}
           <div className="mt-5 flex gap-1.5">
             {STEPS.map((s, i) => (
               <div key={i} className={`h-1 flex-1 rounded-full transition-all duration-300 ${i <= step ? 'bg-indigo-400' : 'bg-white/20'}`} />
@@ -192,12 +201,10 @@ export default function Formulario() {
         {/* Body */}
         <div className="px-8 py-6">{steps[step]}</div>
 
-        {/* Error */}
         {error && (
           <div className="mx-8 mb-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">{error}</div>
         )}
 
-        {/* Footer */}
         <div className="px-8 pb-8 flex justify-between">
           <button onClick={prev} disabled={step === 0}
             className="btn-ghost disabled:opacity-40 disabled:cursor-not-allowed">
