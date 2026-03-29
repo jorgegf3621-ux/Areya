@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { completeTask, getTasks, markEmpleadoActivoSiOnboardingCompleto } from '../lib/supabase'
+import { completeTask, getEmpleadoById, getTasks, markEmpleadoActivoSiOnboardingCompleto } from '../lib/supabase'
 
 const CATEGORIAS = ['Previo al ingreso', 'Inducción', 'Políticas', 'Beneficios', 'Integración al puesto', 'Seguimiento']
+const PORTAL_SESSION_KEY = 'areya_portal_session'
 
 async function portalAuth(action, payload = {}) {
   const res = await fetch('/api/portal-auth', {
@@ -52,6 +53,33 @@ export default function Portal() {
   const activationToken = searchParams.get('token')
   const resetToken = searchParams.get('reset')
   const progress = tasks.length ? Math.round((tasks.filter(t => t.completado).length / tasks.length) * 100) : 0
+  const inputCls = 'px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100 w-full'
+  const emailReady = !!email.trim()
+
+  const persistSession = (emp, currentEmail) => {
+    if (!emp?.id) return
+    localStorage.setItem(PORTAL_SESSION_KEY, JSON.stringify({
+      empleadoId: emp.id,
+      email: currentEmail || emp.email_corporativo || '',
+    }))
+  }
+
+  const clearSession = () => {
+    localStorage.removeItem(PORTAL_SESSION_KEY)
+  }
+
+  const enterPortal = async emp => {
+    const nextTasks = await getTasks(emp.id)
+    setEmpleado(emp)
+    setTasks(nextTasks)
+    setActiveTab(CATEGORIAS[0])
+    setScreen('portal')
+    persistSession(emp, email)
+    if (nextTasks.length && nextTasks.every(task => task.completado)) {
+      await markEmpleadoActivoSiOnboardingCompleto(emp.id)
+      setEmpleado(prev => (prev ? { ...prev, status: 'Activo' } : emp))
+    }
+  }
 
   useEffect(() => {
     const loadToken = async () => {
@@ -84,17 +112,29 @@ export default function Portal() {
     loadToken()
   }, [activationToken, resetToken])
 
-  const enterPortal = async emp => {
-    const nextTasks = await getTasks(emp.id)
-    setEmpleado(emp)
-    setTasks(nextTasks)
-    setActiveTab(CATEGORIAS[0])
-    setScreen('portal')
-    if (nextTasks.length && nextTasks.every(task => task.completado)) {
-      await markEmpleadoActivoSiOnboardingCompleto(emp.id)
-      setEmpleado(prev => (prev ? { ...prev, status: 'Activo' } : emp))
+  useEffect(() => {
+    if (activationToken || resetToken) return
+    const raw = localStorage.getItem(PORTAL_SESSION_KEY)
+    if (!raw) return
+
+    const restore = async () => {
+      try {
+        const session = JSON.parse(raw)
+        if (!session?.empleadoId) return
+        const latestEmpleado = await getEmpleadoById(session.empleadoId)
+        if (!latestEmpleado || latestEmpleado.status === 'Inactivo') {
+          clearSession()
+          return
+        }
+        setEmail(session.email || latestEmpleado.email_corporativo || '')
+        await enterPortal(latestEmpleado)
+      } catch {
+        clearSession()
+      }
     }
-  }
+
+    restore()
+  }, [activationToken, resetToken])
 
   const submitEmail = async () => {
     setLoading(true)
@@ -102,7 +142,8 @@ export default function Portal() {
     setMessage('')
     try {
       const result = await portalAuth('lookup_email', { email })
-      setEmail(result.access.email_corporativo || email.trim().toLowerCase())
+      const normalizedEmail = result.access.email_corporativo || email.trim().toLowerCase()
+      setEmail(normalizedEmail)
       setEmpleado(result.empleado)
       setScreen(result.next)
     } catch (e) {
@@ -143,6 +184,7 @@ export default function Portal() {
     try {
       const result = await portalAuth('login', { email, password })
       setSearchParams({})
+      persistSession(result.empleado, email)
       await enterPortal(result.empleado)
     } catch (e) {
       if (e.code === 'invalid_email') setScreen('invalid')
@@ -206,15 +248,16 @@ export default function Portal() {
   }
 
   const resetToEmail = () => {
+    clearSession()
     setScreen('email')
     setPassword('')
     setConfirmPassword('')
     setError('')
     setMessage('')
+    setTasks([])
+    setEmpleado(null)
     setSearchParams({})
   }
-
-  const inputCls = 'px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100 w-full'
 
   if (screen === 'email') return (
     <AuthShell title="Portal de onboarding">
@@ -226,7 +269,7 @@ export default function Portal() {
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="tu.nombre@areya.com.mx"
-            className={inputCls}
+            className={`${inputCls} ${emailReady ? 'border-accent ring-4 ring-[#A79AF722] shadow-[0_8px_24px_rgba(167,154,247,0.18)]' : ''}`}
             onKeyDown={e => e.key === 'Enter' && submitEmail()}
           />
         </div>
@@ -235,7 +278,12 @@ export default function Portal() {
         </div>
         {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
         {message && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{message}</div>}
-        <button onClick={submitEmail} disabled={loading || !email.trim()} className="btn-primary w-full py-2.5 mt-1 disabled:opacity-60">
+        <button
+          onClick={submitEmail}
+          disabled={loading || !emailReady}
+          className="btn-primary w-full py-2.5 mt-1 disabled:opacity-60"
+          style={emailReady ? { boxShadow: '0 16px 36px rgba(147,132,243,.34)' } : { background: '#d7d1f7', boxShadow: 'none' }}
+        >
           {loading ? 'Verificando...' : 'Continuar →'}
         </button>
       </div>
@@ -243,10 +291,7 @@ export default function Portal() {
   )
 
   if (screen === 'create_password' || screen === 'reset_password') return (
-    <AuthShell
-      title={screen === 'create_password' ? 'Activa tu acceso' : 'Restablece tu contraseña'}
-      subtitle={email}
-    >
+    <AuthShell title={screen === 'create_password' ? 'Activa tu acceso' : 'Restablece tu contraseña'} subtitle={email}>
       <div className="flex flex-col gap-4">
         <div className="text-sm text-gray-500 leading-relaxed">
           {screen === 'create_password'
@@ -356,9 +401,14 @@ export default function Portal() {
           <div className="font-serif text-xl font-bold">Areya</div>
           <div className="text-white/50 text-xs">Portal de onboarding</div>
         </div>
-        <div className="text-right">
-          <div className="text-sm font-semibold">{empleado?.nombre_completo}</div>
-          <div className="text-white/50 text-xs">{empleado?.cargo} · {empleado?.departamento}</div>
+        <div className="flex items-center gap-5">
+          <div className="text-right">
+            <div className="text-sm font-semibold">{empleado?.nombre_completo}</div>
+            <div className="text-white/50 text-xs">{empleado?.cargo} · {empleado?.departamento}</div>
+          </div>
+          <button onClick={resetToEmail} className="text-xs font-semibold text-white/70 hover:text-white">
+            Cerrar sesión
+          </button>
         </div>
       </div>
 

@@ -7,7 +7,7 @@
 @layer base {
   :root {
     --brand: #201d36;
-    --accent: #9a90f5;
+    --accent: #a79af7;
     --sand: #f6f2ec;
     --ink: #6e7382;
     --gold: #f2b56b;
@@ -22,11 +22,12 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer border-none;
-    box-shadow: 0 10px 24px rgba(154, 144, 245, 0.24);
+    @apply text-white px-4 py-2 rounded-xl text-sm font-semibold transition-all cursor-pointer border-none;
+    background: linear-gradient(135deg, #b0a5fb 0%, #9384f3 100%);
+    box-shadow: 0 14px 32px rgba(147, 132, 243, 0.32);
   }
   .btn-primary:hover {
-    background-color: #8b80ef;
+    background: linear-gradient(135deg, #b7adfd 0%, #8a7af0 100%);
   }
   .btn-ghost {
     @apply bg-transparent text-gray-500 px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 hover:bg-gray-100 transition-all cursor-pointer;

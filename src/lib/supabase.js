@@ -65,6 +65,16 @@ export async function getEmpleados(filters = {}) {
   return data
 }
 
+export async function getEmpleadoById(id) {
+  const { data, error } = await supabase
+    .from('empleados')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
 export async function upsertEmpleado(row) {
   const { data, error } = await supabase
     .from('empleados')

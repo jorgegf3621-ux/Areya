@@ -13,6 +13,8 @@ import { TABULADOR, calcCompensacion } from '../lib/tabulador'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
+const ADMIN_SESSION_KEY = 'areya_admin_session'
+
 // Constants
 
 const MASTER_COL_MAP = {
@@ -667,6 +669,15 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
 // â”€â”€â”€ IMPORT PAGE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ImportPage({ importTab, setImportTab, importData, setImportData, importLog, setImportLog, importing, onProcess, onRun, onDownloadTemplate }) {
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleDrop = event => {
+    event.preventDefault()
+    setDragOver(false)
+    const file = event.dataTransfer?.files?.[0]
+    if (file) onProcess(file, importTab)
+  }
+
   return (
     <div className="max-w-2xl">
       <div className="flex gap-2 mb-5 bg-gray-100 rounded-xl p-1 w-fit">
@@ -697,9 +708,16 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
       </div>
 
       {!importData && !importLog && (
-        <label className="block border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all">
+        <label
+          onDragOver={event => { event.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          className={`block border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all ${
+            dragOver ? 'border-indigo-400 bg-indigo-50/70' : 'border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/50'
+          }`}
+        >
           <div className="text-3xl mb-3">📂</div>
-          <div className="text-sm font-semibold text-gray-700 mb-1">Arrastra o haz clic para subir</div>
+          <div className="text-sm font-semibold text-gray-700 mb-1">{dragOver ? 'Suelta el archivo aquí' : 'Arrastra o haz clic para subir'}</div>
           <div className="text-xs text-gray-400">.xlsx · .xls · .csv</div>
           <input type="file" accept=".xlsx,.xls,.csv" className="hidden"
             onChange={e => e.target.files[0] && onProcess(e.target.files[0], importTab)} />
@@ -1269,6 +1287,28 @@ export default function Admin() {
   const showToast = msg => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   useEffect(() => {
+    const raw = localStorage.getItem(ADMIN_SESSION_KEY)
+    if (!raw) return
+    try {
+      const session = JSON.parse(raw)
+      if (session?.user) {
+        setUser(session.user)
+        if (session.page) setPage(session.page)
+      }
+    } catch {
+      localStorage.removeItem(ADMIN_SESSION_KEY)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!user) {
+      localStorage.removeItem(ADMIN_SESSION_KEY)
+      return
+    }
+    localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ user, page }))
+  }, [user, page])
+
+  useEffect(() => {
     if (!user) return
     loadEmpleados()
     loadOffboardingPendientes()
@@ -1479,10 +1519,12 @@ export default function Admin() {
     setLoginMsg('')
     try {
       const { user: authUser } = await adminAuth('login', { email: loginEmail, password: loginPass })
-      setUser({
+      const nextUser = {
         ...authUser,
         initials: (authUser.name || authUser.email).split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('') || 'RH',
-      })
+      }
+      setUser(nextUser)
+      localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify({ user: nextUser, page: 'dashboard' }))
     } catch (e) {
       if (e.code === 'password_not_set') setLoginErr('Tu cuenta aún no tiene contraseña. Usa "Olvidé contraseña".')
       else if (e.code === 'invalid_password') setLoginErr('Contraseña incorrecta')
@@ -1525,6 +1567,7 @@ export default function Admin() {
     const brandBg = { background: BRAND }
     const inputCls = 'px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 w-full'
     const btnPrimary = 'w-full py-2.5 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50'
+    const emailReady = !!loginEmail.trim()
 
     if (loginStep === 'email') return (
       <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
@@ -1539,12 +1582,15 @@ export default function Admin() {
               <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoFocus
                 placeholder="tu.nombre@areya.com.mx"
                 onKeyDown={e => e.key === 'Enter' && handleEmailContinue()}
-                className={inputCls} />
+                className={`${inputCls} ${emailReady ? 'border-accent ring-4 ring-[#A79AF722] shadow-[0_8px_24px_rgba(167,154,247,0.18)]' : ''}`} />
             </div>
             {loginErr && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{loginErr}</div>}
             {loginMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{loginMsg}</div>}
-            <button onClick={handleEmailContinue} disabled={!loginEmail.trim()}
-              className={btnPrimary} style={{ background: ACCENT }}>
+            <button onClick={handleEmailContinue} disabled={!emailReady}
+              className={btnPrimary}
+              style={emailReady
+                ? { background: 'linear-gradient(135deg, #b0a5fb 0%, #9384f3 100%)', boxShadow: '0 16px 36px rgba(147,132,243,.34)' }
+                : { background: '#d7d1f7', boxShadow: 'none' }}>
               Continuar →
             </button>
           </div>
@@ -1673,14 +1719,33 @@ export default function Admin() {
   // â”€â”€ IMPORT LOGIC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const processFile = (file, type) => {
+    if (!file) return
+    setImportData(null)
+    setImportLog(null)
     const reader = new FileReader()
+    reader.onerror = () => {
+      showToast('No fue posible leer el archivo.')
+    }
     reader.onload = e => {
-      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
-      if (!rows.length) { showToast('⚠ El archivo está vacío'); return }
-      setImportData({ rows, fileName: file.name, type })
-      setImportLog(null)
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true })
+        const firstSheetName = wb.SheetNames?.[0]
+        const ws = firstSheetName ? wb.Sheets[firstSheetName] : null
+        if (!ws) {
+          showToast('El archivo no contiene una hoja válida.')
+          return
+        }
+        const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+        if (!rows.length) {
+          showToast('⚠ El archivo está vacío')
+          return
+        }
+        setImportData({ rows, fileName: file.name, type })
+        setImportLog(null)
+      } catch (err) {
+        console.error('processFile error:', err)
+        showToast('Ese archivo no se pudo abrir. Revisa el formato e inténtalo de nuevo.')
+      }
     }
     reader.readAsArrayBuffer(file)
   }
@@ -1778,10 +1843,24 @@ export default function Admin() {
           <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0" style={{ background: ACCENT }}>
             {user.initials}
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="text-white text-xs font-semibold">{user.name}</div>
             <div className="text-xs" style={{ color: 'rgba(255,255,255,.35)' }}>{user.rol}</div>
           </div>
+          <button
+            onClick={() => {
+              localStorage.removeItem(ADMIN_SESSION_KEY)
+              setUser(null)
+              setPage('dashboard')
+              setLoginStep('email')
+              setLoginPass('')
+              setLoginErr('')
+              setLoginMsg('')
+            }}
+            className="text-[11px] font-semibold text-white/60 hover:text-white"
+          >
+            Salir
+          </button>
         </div>
       </div>
 
