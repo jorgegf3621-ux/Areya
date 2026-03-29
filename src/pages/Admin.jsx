@@ -2010,7 +2010,7 @@ export default function Admin() {
                 .map(([key, value]) => {
                   if (MONEY_FIELDS.has(key)) return [key, parseMoneyLike(value)]
                   if (PCT_FIELDS.has(key)) return [key, parsePercentLike(value)]
-                  if (NUM_FIELDS.has(key)) return [key, value != null ? Number(String(value).replace(/[^\d.-]/g, '')) || null : null]
+                  if (NUM_FIELDS.has(key)) { const n = Number(String(value).replace(/[^\d.-]/g, '')); return [key, Number.isFinite(n) ? n : null] }
                   return [key, value]
                 })
                 .filter(([, v]) => v !== null && v !== '')
@@ -2020,7 +2020,7 @@ export default function Admin() {
             const { data: ex, error: lookupError } = await supabase
               .from('empleados')
               .select('id')
-              .eq('ID Colaborador', mappedMaster['ID Colaborador'])
+              .eq('ID Colaborador', String(mappedMaster['ID Colaborador']).trim())
               .maybeSingle()
 
             if (lookupError) throw lookupError
@@ -2044,7 +2044,7 @@ export default function Admin() {
               Object.entries(mappedTabulador)
                 .filter(([, value]) => value !== '' && value != null)
                 .map(([key, value]) => {
-                  if (key === 'nivel') return [key, Number(String(value).replace(/[^\d.-]/g, ''))]
+                  if (key === 'nivel') { const n = Number(String(value).replace(/[^\d.-]/g, '')); return [key, Number.isFinite(n) ? n : null] }
                   if (key === 'brinco') return [key, parsePercentLike(value)]
                   if (['referencia_comp', 'limite_inferior', 'limite_superior'].includes(key)) return [key, parseMoneyLike(value)]
                   return [key, value]
