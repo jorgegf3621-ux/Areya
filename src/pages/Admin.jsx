@@ -69,10 +69,10 @@ const LIM_SUP_COL = 'Límite superior de banda (120%)'
 const TABULADOR_COL_MAP = {
   'familia de puesto':'familia_puesto','familia puesto':'familia_puesto','familia':'familia_puesto',
   'nivel':'nivel',
-  'referencia c':REF_COL,'referencia comp':REF_COL,'referencia':REF_COL,'referencia objetivo':REF_COL,'referencia objetivo 80':REF_COL,
+  'referencia c':REF_COL,'referencia comp':REF_COL,'referencia':REF_COL,'referencia objetivo':REF_COL,'referencia objetivo 80':REF_COL,'referencia objetivo 80%':REF_COL,
   'brinco':'brinco','brinco %':'brinco','porcentaje brinco':'brinco',
   'limite inferior':LIM_INF_COL,'limite inf':LIM_INF_COL,'limite inferi':LIM_INF_COL,'limite inferior $':LIM_INF_COL,'limite inferior de banda':LIM_INF_COL,
-  'limite superior':LIM_SUP_COL,'limite sup':LIM_SUP_COL,'limite super':LIM_SUP_COL,'limite superior $':LIM_SUP_COL,'limite superior de banda':LIM_SUP_COL,'limite superior de banda 120':LIM_SUP_COL,
+  'limite superior':LIM_SUP_COL,'limite sup':LIM_SUP_COL,'limite super':LIM_SUP_COL,'limite superior $':LIM_SUP_COL,'limite superior de banda':LIM_SUP_COL,'limite superior de banda 120':LIM_SUP_COL,'limite superior de banda 120%':LIM_SUP_COL,
   'rango':'rango',
 }
 
@@ -1688,7 +1688,7 @@ export default function Admin() {
     // Finanzas
     const costoTotal = activos_ob.reduce((s,e) => s+(e.costo_real_mens||0), 0)
     const costoAnual = activos_ob.reduce((s,e) => s+(e.costo_real_anual||0), 0)
-    const promCosto = activos.length ? costoTotal / activos.length : 0
+    const promCosto = activos_ob.length ? costoTotal / activos_ob.length : 0
     const distPct = costoTotal ? [
       { l: 'Sueldo base', v: Math.round(activos_ob.reduce((s,e)=>s+(e.sueldo_bruto||0),0)/costoTotal*100) },
       { l: 'Despensa', v: Math.round(activos_ob.reduce((s,e)=>s+(e.despensa||0),0)/costoTotal*100) },
