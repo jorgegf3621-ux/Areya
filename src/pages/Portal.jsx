@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
-import { supabase, getTasks, completeTask, requestAccess } from '../lib/supabase'
+import { useState } from 'react'
+import { supabase, getTasks, completeTask } from '../lib/supabase'
 
 const CATEGORIAS = ['Previo al ingreso', 'Inducción', 'Políticas', 'Beneficios', 'Integración al puesto', 'Seguimiento']
 
 export default function Portal() {
-  const [screen, setScreen] = useState('login') // login | not_found | pending | portal
+  const [screen, setScreen] = useState('login') // login | not_found | portal
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [empleado, setEmpleado] = useState(null)
@@ -50,14 +50,6 @@ export default function Portal() {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, completado: true, fecha_completado: new Date().toISOString() } : t))
   }
 
-  const handleRequestAccess = async () => {
-    setLoading(true)
-    const result = await requestAccess(email)
-    setLoading(false)
-    if (result.error === 'no_employee') { setError('No encontramos ese correo. Verifica con RRHH.'); return }
-    setScreen('pending')
-  }
-
   // ── SCREENS ──────────────────────────────────────────────
 
   if (screen === 'login') return (
@@ -86,9 +78,6 @@ export default function Portal() {
             <button onClick={login} disabled={loading} className="btn-primary w-full py-2.5 mt-1">
               {loading ? 'Verificando...' : 'Entrar al portal'}
             </button>
-            <button onClick={handleRequestAccess} className="text-xs text-indigo-600 text-center hover:underline cursor-pointer">
-              ¿Primera vez? Solicitar acceso
-            </button>
           </div>
         </div>
       </div>
@@ -106,19 +95,8 @@ export default function Portal() {
     </div>
   )
 
-  if (screen === 'pending') return (
-    <div className="min-h-screen bg-brand flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-sm w-full text-center">
-        <div className="text-4xl mb-4">⏳</div>
-        <h2 className="font-serif text-xl font-bold text-brand mb-2">Solicitud enviada</h2>
-        <p className="text-gray-500 text-sm">Tu solicitud de acceso fue enviada al equipo de RRHH. En cuanto sea aprobada recibirás un correo con tu acceso.</p>
-      </div>
-    </div>
-  )
-
   // ── PORTAL PRINCIPAL ──────────────────────────────────────
   const tasksByTab = tasks.filter(t => t.categoria === activeTab)
-  const doneByTab = tasksByTab.filter(t => t.completado).length
 
   return (
     <div className="min-h-screen bg-gray-50">
