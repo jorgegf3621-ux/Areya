@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Outfit', sans-serif;
+    background-color: #F4F5F7;
+    color: #111827;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-all cursor-pointer border-none;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-gray-500 px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 hover:bg-gray-100 transition-all cursor-pointer;
+  }
+  .card {
+    @apply bg-white rounded-xl shadow-sm p-5;
+  }
+  .badge-active   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800; }
+  .badge-onboarding { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800; }
+  .badge-offboarding { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800; }
+  .badge-inactive { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-600; }
+}
