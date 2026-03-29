@@ -1960,20 +1960,27 @@ export default function Admin() {
     reader.onload = e => {
       try {
         const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true })
-        const firstSheetName = wb.SheetNames?.[0]
-        const ws = firstSheetName ? wb.Sheets[firstSheetName] : null
-        if (!ws) {
-          showToast('El archivo no contiene una hoja válida.')
+        if (!wb.SheetNames?.length) {
+          showToast('El archivo no contiene hojas válidas.')
           return
         }
-        const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-        const headerRowIndex = findHeaderRowIndex(matrix, type)
-        const rows = buildRowsFromMatrix(matrix, headerRowIndex)
-        if (!rows.length) {
+        // For master type: read ALL sheets and merge rows (employee data + tabulador on separate sheets)
+        // For tareas type: first sheet only
+        const sheetNames = type === 'master' ? wb.SheetNames : [wb.SheetNames[0]]
+        const allRows = []
+        for (const sheetName of sheetNames) {
+          const ws = wb.Sheets[sheetName]
+          if (!ws) continue
+          const matrix = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+          const headerRowIndex = findHeaderRowIndex(matrix, type)
+          const rows = buildRowsFromMatrix(matrix, headerRowIndex)
+          allRows.push(...rows)
+        }
+        if (!allRows.length) {
           showToast('⚠ El archivo está vacío')
           return
         }
-        setImportData({ rows, fileName: file.name, type })
+        setImportData({ rows: allRows, fileName: file.name, type })
         setImportLog(null)
       } catch (err) {
         console.error('processFile error:', err)
