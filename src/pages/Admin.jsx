@@ -32,7 +32,8 @@ const MASTER_COL_MAP = {
   'cargo':'Puesto','puesto':'Puesto','tipo de contrato':'Tipo de contratación','tipo contrato':'Tipo de contratación','tipo de contratacion':'Tipo de contratación',
   'jefe directo':'jefe_directo','supervisor':'jefe_directo',
   'email corporativo':'email_corporativo','correo corporativo':'email_corporativo',
-  'fecha termino':'fecha_termino','razon de termino':'razon_termino',
+  'fecha termino':'fecha_termino','fecha de termino':'fecha_termino','fecha terminacion':'fecha_termino','fecha de terminacion':'fecha_termino',
+  'razon de termino':'razon_termino','razon termino':'razon_termino','motivo termino':'razon_termino','motivo de termino':'razon_termino',
   'antiguedad':'antiguedad','antigüedad':'antiguedad',
   'familia de puesto':'familia_puesto','familia puesto':'familia_puesto','familia':'familia_puesto',
   'nivel tab':'nivel_tab','nivel':'nivel_tab','nivel tabulador':'nivel_tab',
@@ -711,7 +712,6 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
     { key: 'Tipo de contratación', label: 'Tipo contrato', render: e => e['Tipo de contratación'] || '—' },
     { key: 'jefe_directo', label: 'Jefe directo', render: e => e.jefe_directo || '—' },
     { key: 'email_corporativo', label: 'Email corporativo', render: e => e.email_corporativo || '—', className: 'font-mono text-xs', style: { color: ACCENT } },
-    { key: 'email_personal', label: 'Email personal', render: e => e.email_personal || '—', className: 'font-mono text-xs' },
     { key: 'fecha_termino', label: 'Fecha término', render: e => fmtDate(e.fecha_termino), className: 'text-xs text-gray-500 whitespace-nowrap' },
     { key: 'razon_termino', label: 'Razón término', render: e => e.razon_termino || '—', className: 'text-xs' },
     // Tabulador (fondo azul claro)
@@ -763,7 +763,7 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
           rfc: e.rfc, curp: e.curp, nss: e.nss, direccion: e.direccion, municipio: e.municipio,
           fecha_ingreso: e.fecha_ingreso, departamento: e.departamento, 'Puesto': e['Puesto'],
           'Tipo de contratación': e['Tipo de contratación'], jefe_directo: e.jefe_directo,
-          email_corporativo: e.email_corporativo, email_personal: e.email_personal,
+          email_corporativo: e.email_corporativo,
           fecha_termino: e.fecha_termino, razon_termino: e.razon_termino,
           antiguedad: e.antiguedad, razon_social: e.razon_social, familia_puesto: e.familia_puesto,
           nivel_tab: e.nivel_tab, gente_a_cargo: e.gente_a_cargo, rango_sueldo: e.rango_sueldo,
@@ -2033,6 +2033,7 @@ export default function Admin() {
                   if (MONEY_FIELDS.has(key)) return [key, parseMoneyLike(value)]
                   if (PCT_FIELDS.has(key)) return [key, parsePercentLike(value)]
                   if (NUM_FIELDS.has(key)) { const n = Number(String(value).replace(/[^\d.-]/g, '')); return [key, Number.isFinite(n) ? n : null] }
+                  if (value instanceof Date) return [key, value.getFullYear() > 1901 ? value.toISOString().slice(0, 10) : '']
                   return [key, value]
                 })
                 .filter(([, v]) => v !== null && v !== '')
