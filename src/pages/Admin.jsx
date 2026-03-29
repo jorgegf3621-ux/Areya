@@ -177,7 +177,13 @@ function buildRowsFromMatrix(matrix, headerRowIndex) {
     const obj = {}
     headers.forEach((header, colIndex) => {
       if (!header) return
-      obj[header] = row[colIndex] ?? ''
+      const cell = row[colIndex]
+      // cellDates:true can convert empty/zero cells to epoch dates — treat pre-1902 dates as empty
+      if (cell instanceof Date) {
+        obj[header] = cell.getFullYear() > 1901 ? cell.toISOString().slice(0, 10) : ''
+      } else {
+        obj[header] = cell ?? ''
+      }
     })
     rows.push(obj)
   }
@@ -429,10 +435,10 @@ function FinanzasTab({ stats }) {
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="font-serif text-sm font-bold mb-3">Top 5 por costo real mensual</div>
           <div className="flex flex-col gap-2">
-            {[...active].sort((a,b) => (b.costo_real_mens||0)-(a.costo_real_mens||0)).slice(0,5).map(e => (
+            {[...active].sort((a,b) => (b.costo_real_mens||b.costo_real_anual/12||0)-(a.costo_real_mens||a.costo_real_anual/12||0)).slice(0,5).map(e => (
               <div key={e.id} className="flex items-center justify-between text-sm">
                 <span className="text-gray-700 truncate max-w-48">{e.nombre_completo || '—'}</span>
-                <span className="font-bold text-emerald-600 ml-2 flex-shrink-0">{fmt(e.costo_real_mens)}</span>
+                <span className="font-bold text-emerald-600 ml-2 flex-shrink-0">{fmt(e.costo_real_mens || (e.costo_real_anual ? e.costo_real_anual/12 : null))}</span>
               </div>
             ))}
           </div>
@@ -462,8 +468,8 @@ function FinanzasTab({ stats }) {
                     </td>
                     <td className="px-3 py-2.5">{fmt(e.sueldo_bruto)}</td>
                     <td className="px-3 py-2.5">{fmt(benef)}</td>
-                    <td className="px-3 py-2.5 font-bold" style={{ color: ACCENT }}>{fmt(e.costo_real_mens)}</td>
-                    <td className="px-3 py-2.5">{fmt(e.costo_real_anual)}</td>
+                    <td className="px-3 py-2.5 font-bold" style={{ color: ACCENT }}>{fmt(e.costo_real_mens || (e.costo_real_anual ? e.costo_real_anual/12 : null))}</td>
+                    <td className="px-3 py-2.5">{fmt(e.costo_real_anual || (e.costo_real_mens ? e.costo_real_mens*12 : null))}</td>
                   </tr>
                 )
               })}
@@ -1629,9 +1635,6 @@ export default function Admin() {
 
   const stats = useMemo(() => {
     if (!empleados.length) return null
-    const now = new Date()
-    const currentYear = now.getFullYear()
-
     const activos = empleados.filter(e => e.status === 'Activo')
     const onboarding = empleados.filter(e => e.status === 'Onboarding')
     const offboarding = empleados.filter(e => e.status === 'Offboarding')
@@ -1685,9 +1688,10 @@ export default function Admin() {
       else antigMap['5+ años']++
     })
 
-    // Finanzas
-    const costoTotal = activos_ob.reduce((s,e) => s+(e.costo_real_mens||0), 0)
-    const costoAnual = activos_ob.reduce((s,e) => s+(e.costo_real_anual||0), 0)
+    // Finanzas — fall back to costo_real_anual/12 when monthly is missing
+    const costoMens = e => e.costo_real_mens || (e.costo_real_anual ? e.costo_real_anual / 12 : 0)
+    const costoTotal = activos_ob.reduce((s,e) => s + costoMens(e), 0)
+    const costoAnual = activos_ob.reduce((s,e) => s+(e.costo_real_anual || costoMens(e)*12||0), 0)
     const promCosto = activos_ob.length ? costoTotal / activos_ob.length : 0
     const distPct = costoTotal ? [
       { l: 'Sueldo base', v: Math.round(activos_ob.reduce((s,e)=>s+(e.sueldo_bruto||0),0)/costoTotal*100) },
@@ -1700,8 +1704,8 @@ export default function Admin() {
       { l: 'Seg. vida', v: Math.round(activos_ob.reduce((s,e)=>s+(e.seguro_vida||0),0)/costoTotal*100) },
     ].filter(d => d.v > 0) : []
 
-    // Attrition
-    const bajasAnio = inactivos.filter(e => e.fecha_termino?.startsWith(String(currentYear))).length
+    // Attrition — use all registered bajas (not restricted to current year)
+    const bajasAnio = inactivos.length
     const tasaRot = activos.length ? +((bajasAnio / (activos.length + bajasAnio)) * 100).toFixed(1) : 0
     const antigSalidaVals = inactivos.filter(e => e.fecha_ingreso && e.fecha_termino)
       .map(e => (new Date(e.fecha_termino) - new Date(e.fecha_ingreso)) / (1000*60*60*24*365.25))
@@ -1710,9 +1714,9 @@ export default function Admin() {
 
     const motivoMap = countBy(inactivos, 'razon_termino')
     const bajasMes = Array(12).fill(0)
-    inactivos.filter(e => e.fecha_termino?.startsWith(String(currentYear)))
+    inactivos.filter(e => e.fecha_termino && new Date(e.fecha_termino).getFullYear() > 1901)
       .forEach(e => bajasMes[new Date(e.fecha_termino).getMonth()]++)
-    const bajasDeptMap = countBy(inactivos, 'departamento')
+    const bajasDeptMap = countBy(inactivos.filter(e => e.departamento), 'departamento')
 
     return {
       headcount: activos.length, onboarding: onboarding.length, offboarding: offboarding.length, total,
