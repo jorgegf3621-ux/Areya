@@ -643,9 +643,35 @@ function DashboardPage({ stats, empleados, pendingAdmins, onApproveAdmin, dashTa
 // â”€â”€â”€ MASTER TABLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilter, loading, onLoad, showToast }) {
+  const columns = [
+    { key: 'id_colaborador', label: 'ID', render: e => e.id_colaborador || '—', className: 'text-xs text-gray-400 font-mono' },
+    { key: 'nombre_completo', label: 'Nombre', render: e => e.nombre_completo || '—', className: 'font-semibold whitespace-nowrap', style: { color: ACCENT } },
+    { key: 'status', label: 'Status', render: e => <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_CLS[e.status] || 'bg-gray-100 text-gray-500'}`}>{e.status}</span> },
+    { key: 'uen', label: 'UEN', render: e => e.uen || '—' },
+    { key: 'razon_social', label: 'Razón social', render: e => e.razon_social || '—' },
+    { key: 'rfc', label: 'RFC', render: e => e.rfc || '—', className: 'font-mono text-xs' },
+    { key: 'curp', label: 'CURP', render: e => e.curp || '—', className: 'font-mono text-xs' },
+    { key: 'nss', label: 'NSS', render: e => e.nss || '—', className: 'font-mono text-xs' },
+    { key: 'departamento', label: 'Departamento', render: e => e.departamento || '—' },
+    { key: 'cargo', label: 'Cargo', render: e => e.cargo || '—' },
+    { key: 'tipo_contrato', label: 'Tipo contrato', render: e => e.tipo_contrato || '—' },
+    { key: 'jefe_directo', label: 'Supervisor', render: e => e.jefe_directo || '—' },
+    { key: 'email_corporativo', label: 'Email corporativo', render: e => e.email_corporativo || '—', className: 'font-mono text-xs', style: { color: ACCENT } },
+    { key: 'fecha_ingreso', label: 'Ingreso', render: e => fmtDate(e.fecha_ingreso), className: 'text-xs text-gray-500 whitespace-nowrap' },
+    { key: 'fecha_termino', label: 'Término', render: e => fmtDate(e.fecha_termino), className: 'text-xs text-gray-500 whitespace-nowrap' },
+    { key: 'familia_puesto', label: 'Familia puesto', render: e => e.familia_puesto || '—' },
+    { key: 'nivel_tab', label: 'Nivel', render: e => e.nivel_tab ?? '—' },
+    { key: 'sueldo_bruto', label: 'Sueldo bruto', render: e => fmt(e.sueldo_bruto), className: 'text-xs font-semibold whitespace-nowrap' },
+    { key: 'sueldo_neto', label: 'Sueldo neto', render: e => fmt(e.sueldo_neto), className: 'text-xs font-semibold whitespace-nowrap' },
+    { key: 'costo_real_mens', label: 'Costo real/mes', render: e => fmt(e.costo_real_mens), className: 'text-xs font-bold text-emerald-700 whitespace-nowrap' },
+    { key: 'costo_real_anual', label: 'Costo real/año', render: e => fmt(e.costo_real_anual), className: 'text-xs font-bold text-emerald-700 whitespace-nowrap' },
+  ]
+
   const filtered = empleados.filter(e => {
     const q = search.toLowerCase()
-    const match = !q || (e.nombre_completo||'').toLowerCase().includes(q) || (e.rfc||'').toLowerCase().includes(q) || (e.email_corporativo||'').toLowerCase().includes(q)
+    const match = !q || [
+      e.nombre_completo, e.rfc, e.curp, e.nss, e.email_corporativo, e.id_colaborador, e.departamento, e.cargo,
+    ].some(value => (value || '').toString().toLowerCase().includes(q))
     const st = !statusFilter || e.status === statusFilter
     return match && st
   })
@@ -657,17 +683,25 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
         rows: filtered.map(e => ({
           id_colaborador: e.id_colaborador,
           nombre_completo: e.nombre_completo,
+          status: e.status,
+          uen: e.uen,
+          razon_social: e.razon_social,
           rfc: e.rfc,
           curp: e.curp,
           nss: e.nss,
           departamento: e.departamento,
           cargo: e.cargo,
+          tipo_contrato: e.tipo_contrato,
+          jefe_directo: e.jefe_directo,
           email_corporativo: e.email_corporativo,
           fecha_ingreso: e.fecha_ingreso,
           fecha_termino: e.fecha_termino,
-          status: e.status,
+          familia_puesto: e.familia_puesto,
+          nivel_tab: e.nivel_tab,
           sueldo_bruto: e.sueldo_bruto,
+          sueldo_neto: e.sueldo_neto,
           costo_real_mens: e.costo_real_mens,
+          costo_real_anual: e.costo_real_anual,
         })),
       },
     ])
@@ -676,7 +710,7 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
   return (
     <div>
       <div className="flex gap-3 mb-4 flex-wrap">
-        <input type="text" placeholder="Buscar nombre, RFC, email..." value={search}
+        <input type="text" placeholder="Buscar nombre, RFC, CURP, NSS, ID o email..." value={search}
           onChange={e => setSearch(e.target.value)}
           className="flex-1 min-w-48 px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500" />
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
@@ -693,32 +727,25 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['ID','Nombre','RFC','Departamento','Cargo','Email corporativo','Ingreso','Sueldo bruto','Costo real/mes','Status'].map(h => (
-                  <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                {columns.map(col => (
+                  <th key={col.key} className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{col.label}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {loading && <tr><td colSpan={10} className="text-center py-10 text-gray-400">Cargando...</td></tr>}
+              {loading && <tr><td colSpan={columns.length} className="text-center py-10 text-gray-400">Cargando...</td></tr>}
               {!loading && filtered.length === 0 && (
-                <tr><td colSpan={10} className="text-center py-10 text-gray-400">
+                <tr><td colSpan={columns.length} className="text-center py-10 text-gray-400">
                   {empleados.length === 0 ? 'No hay registros. Importa el master para comenzar.' : 'Sin resultados para esa búsqueda.'}
                 </td></tr>
               )}
               {filtered.map(e => (
                 <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 text-xs text-gray-400 font-mono">{e.id_colaborador}</td>
-                  <td className="px-4 py-3 font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{e.nombre_completo}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{e.rfc || '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{e.departamento || '—'}</td>
-                  <td className="px-4 py-3 text-gray-600 max-w-36 truncate">{e.cargo || '—'}</td>
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: ACCENT }}>{e.email_corporativo || '—'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(e.fecha_ingreso)}</td>
-                  <td className="px-4 py-3 text-xs font-semibold">{fmt(e.sueldo_bruto)}</td>
-                  <td className="px-4 py-3 text-xs font-bold text-emerald-700">{fmt(e.costo_real_mens)}</td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_CLS[e.status] || 'bg-gray-100 text-gray-500'}`}>{e.status}</span>
-                  </td>
+                  {columns.map(col => (
+                    <td key={col.key} className={`px-4 py-3 ${col.className || 'text-gray-600'}`} style={col.style || {}}>
+                      {col.render(e)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
