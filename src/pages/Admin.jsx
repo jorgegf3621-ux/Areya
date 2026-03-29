@@ -663,27 +663,61 @@ function DashboardPage({ stats, empleados, pendingAdmins, onApproveAdmin, dashTa
 
 function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilter, loading, onLoad, showToast }) {
   const columns = [
-    { key: 'id_colaborador', label: 'ID', render: e => e.id_colaborador || '—', className: 'text-xs text-gray-400 font-mono' },
-    { key: 'nombre_completo', label: 'Nombre', render: e => e.nombre_completo || '—', className: 'font-semibold whitespace-nowrap', style: { color: ACCENT } },
-    { key: 'status', label: 'Status', render: e => <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_CLS[e.status] || 'bg-gray-100 text-gray-500'}`}>{e.status}</span> },
+    // Identificación
     { key: 'uen', label: 'UEN', render: e => e.uen || '—' },
-    { key: 'razon_social', label: 'Razón social', render: e => e.razon_social || '—' },
+    { key: 'id_colaborador', label: 'ID Colab.', render: e => e.id_colaborador || '—', className: 'text-xs text-gray-400 font-mono' },
+    { key: 'status', label: 'Status', render: e => <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_CLS[e.status] || 'bg-gray-100 text-gray-500'}`}>{e.status}</span> },
+    { key: 'nombre_completo', label: 'Nombre completo', render: e => e.nombre_completo || '—', className: 'font-semibold whitespace-nowrap', style: { color: ACCENT } },
+    { key: 'nombre', label: 'Nombre(s)', render: e => e.nombre || '—' },
+    { key: 'ap_pat', label: 'Ap. Paterno', render: e => e.ap_pat || '—' },
+    { key: 'ap_mat', label: 'Ap. Materno', render: e => e.ap_mat || '—' },
+    // Datos personales
+    { key: 'fecha_nac', label: 'Fecha Nacim.', render: e => fmtDate(e.fecha_nac), className: 'text-xs text-gray-500 whitespace-nowrap' },
+    { key: 'genero', label: 'Género', render: e => e.genero || '—' },
+    { key: 'estado_civil', label: 'Estado civil', render: e => e.estado_civil || '—' },
+    { key: 'nacionalidad', label: 'Nacionalidad', render: e => e.nacionalidad || '—' },
     { key: 'rfc', label: 'RFC', render: e => e.rfc || '—', className: 'font-mono text-xs' },
     { key: 'curp', label: 'CURP', render: e => e.curp || '—', className: 'font-mono text-xs' },
     { key: 'nss', label: 'NSS', render: e => e.nss || '—', className: 'font-mono text-xs' },
+    { key: 'direccion', label: 'Dirección', render: e => e.direccion || '—', className: 'text-xs max-w-36 truncate' },
+    { key: 'municipio', label: 'Municipio', render: e => e.municipio || '—' },
+    // Empleo
+    { key: 'fecha_ingreso', label: 'Fecha ingreso', render: e => fmtDate(e.fecha_ingreso), className: 'text-xs text-gray-500 whitespace-nowrap' },
     { key: 'departamento', label: 'Departamento', render: e => e.departamento || '—' },
-    { key: 'cargo', label: 'Cargo', render: e => e.cargo || '—' },
+    { key: 'cargo', label: 'Cargo', render: e => e.cargo || '—', className: 'max-w-36 truncate' },
     { key: 'tipo_contrato', label: 'Tipo contrato', render: e => e.tipo_contrato || '—' },
-    { key: 'jefe_directo', label: 'Supervisor', render: e => e.jefe_directo || '—' },
+    { key: 'jefe_directo', label: 'Jefe directo', render: e => e.jefe_directo || '—' },
     { key: 'email_corporativo', label: 'Email corporativo', render: e => e.email_corporativo || '—', className: 'font-mono text-xs', style: { color: ACCENT } },
-    { key: 'fecha_ingreso', label: 'Ingreso', render: e => fmtDate(e.fecha_ingreso), className: 'text-xs text-gray-500 whitespace-nowrap' },
-    { key: 'fecha_termino', label: 'Término', render: e => fmtDate(e.fecha_termino), className: 'text-xs text-gray-500 whitespace-nowrap' },
-    { key: 'familia_puesto', label: 'Familia puesto', render: e => e.familia_puesto || '—' },
-    { key: 'nivel_tab', label: 'Nivel', render: e => e.nivel_tab ?? '—' },
-    { key: 'sueldo_bruto', label: 'Sueldo bruto', render: e => fmt(e.sueldo_bruto), className: 'text-xs font-semibold whitespace-nowrap' },
-    { key: 'sueldo_neto', label: 'Sueldo neto', render: e => fmt(e.sueldo_neto), className: 'text-xs font-semibold whitespace-nowrap' },
-    { key: 'costo_real_mens', label: 'Costo real/mes', render: e => fmt(e.costo_real_mens), className: 'text-xs font-bold text-emerald-700 whitespace-nowrap' },
-    { key: 'costo_real_anual', label: 'Costo real/año', render: e => fmt(e.costo_real_anual), className: 'text-xs font-bold text-emerald-700 whitespace-nowrap' },
+    { key: 'email_personal', label: 'Email personal', render: e => e.email_personal || '—', className: 'font-mono text-xs' },
+    { key: 'fecha_termino', label: 'Fecha término', render: e => fmtDate(e.fecha_termino), className: 'text-xs text-gray-500 whitespace-nowrap' },
+    { key: 'razon_termino', label: 'Razón término', render: e => e.razon_termino || '—', className: 'text-xs' },
+    // Tabulador (fondo azul claro)
+    { key: 'antiguedad', label: 'Antigüedad', render: e => e.antiguedad || '—', className: 'text-xs', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'razon_social', label: 'Razón social', render: e => e.razon_social || '—', className: 'text-xs', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'familia_puesto', label: 'Familia puesto', render: e => e.familia_puesto || '—', className: 'text-xs', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'nivel_tab', label: 'Nivel', render: e => e.nivel_tab ?? '—', className: 'text-xs', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'gente_a_cargo', label: 'Gente a cargo', render: e => e.gente_a_cargo ?? '—', className: 'text-xs text-center', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'rango_sueldo', label: 'Rango sueldo', render: e => e.rango_sueldo || '—', className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'punto_medio', label: 'Punto medio', render: e => fmt(e.punto_medio), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'dif_pct', label: 'Dif. %', render: e => e.dif_pct != null ? `${e.dif_pct > 0 ? '+' : ''}${e.dif_pct}%` : '—', className: 'text-xs', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'dif_pesos', label: 'Dif. $', render: e => fmt(e.dif_pesos), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'sueldo_bruto', label: 'Sueldo bruto', render: e => fmt(e.sueldo_bruto), className: 'text-xs font-semibold whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'sueldo_neto', label: 'Sueldo neto', render: e => fmt(e.sueldo_neto), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'gasolina', label: 'Gasolina', render: e => fmt(e.gasolina), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'despensa', label: 'Despensa 12%', render: e => fmt(e.despensa), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'fondo_ahorro', label: 'Fondo ahorro', render: e => fmt(e.fondo_ahorro), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'meses_bono', label: 'Meses bono', render: e => e.meses_bono ?? '—', className: 'text-xs text-center', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'pct_prima', label: '% Prima', render: e => e.pct_prima != null ? `${e.pct_prima}%` : '—', className: 'text-xs text-center', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'prima_vacacional', label: 'Prima vacacional', render: e => fmt(e.prima_vacacional), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'mant_auto', label: 'Mant. auto', render: e => fmt(e.mant_auto), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'monto_celular', label: 'Monto celular', render: e => fmt(e.monto_celular), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'celular', label: 'Celular', render: e => e.celular || '—', className: 'text-xs text-center', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'sgmm', label: 'SGMM', render: e => fmt(e.sgmm), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'seguro_vida', label: 'Seguro vida', render: e => fmt(e.seguro_vida), className: 'text-xs whitespace-nowrap', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    { key: 'comentarios', label: 'Comentarios', render: e => e.comentarios || '—', className: 'text-xs max-w-40 truncate', thStyle: { background: '#EEF2FF', color: '#3730A3' }, tdStyle: { background: '#F5F3FF' } },
+    // Costo real (fondo verde)
+    { key: 'costo_real_mens', label: 'Costo real/mes', render: e => fmt(e.costo_real_mens), className: 'text-xs font-bold whitespace-nowrap', thStyle: { background: '#D1FAE5', color: '#065F46' }, tdStyle: { background: '#ECFDF5', color: '#047857' } },
+    { key: 'costo_real_anual', label: 'Costo real/año', render: e => fmt(e.costo_real_anual), className: 'text-xs font-bold whitespace-nowrap', thStyle: { background: '#D1FAE5', color: '#065F46' }, tdStyle: { background: '#ECFDF5', color: '#047857' } },
   ]
 
   const filtered = empleados.filter(e => {
@@ -700,27 +734,23 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
       {
         name: 'Master',
         rows: filtered.map(e => ({
-          id_colaborador: e.id_colaborador,
-          nombre_completo: e.nombre_completo,
-          status: e.status,
-          uen: e.uen,
-          razon_social: e.razon_social,
-          rfc: e.rfc,
-          curp: e.curp,
-          nss: e.nss,
-          departamento: e.departamento,
-          cargo: e.cargo,
-          tipo_contrato: e.tipo_contrato,
-          jefe_directo: e.jefe_directo,
-          email_corporativo: e.email_corporativo,
-          fecha_ingreso: e.fecha_ingreso,
-          fecha_termino: e.fecha_termino,
-          familia_puesto: e.familia_puesto,
-          nivel_tab: e.nivel_tab,
-          sueldo_bruto: e.sueldo_bruto,
-          sueldo_neto: e.sueldo_neto,
-          costo_real_mens: e.costo_real_mens,
-          costo_real_anual: e.costo_real_anual,
+          uen: e.uen, id_colaborador: e.id_colaborador, status: e.status,
+          nombre_completo: e.nombre_completo, nombre: e.nombre, ap_pat: e.ap_pat, ap_mat: e.ap_mat,
+          fecha_nac: e.fecha_nac, genero: e.genero, estado_civil: e.estado_civil, nacionalidad: e.nacionalidad,
+          rfc: e.rfc, curp: e.curp, nss: e.nss, direccion: e.direccion, municipio: e.municipio,
+          fecha_ingreso: e.fecha_ingreso, departamento: e.departamento, cargo: e.cargo,
+          tipo_contrato: e.tipo_contrato, jefe_directo: e.jefe_directo,
+          email_corporativo: e.email_corporativo, email_personal: e.email_personal,
+          fecha_termino: e.fecha_termino, razon_termino: e.razon_termino,
+          antiguedad: e.antiguedad, razon_social: e.razon_social, familia_puesto: e.familia_puesto,
+          nivel_tab: e.nivel_tab, gente_a_cargo: e.gente_a_cargo, rango_sueldo: e.rango_sueldo,
+          punto_medio: e.punto_medio, dif_pct: e.dif_pct, dif_pesos: e.dif_pesos,
+          sueldo_bruto: e.sueldo_bruto, sueldo_neto: e.sueldo_neto,
+          gasolina: e.gasolina, despensa: e.despensa, fondo_ahorro: e.fondo_ahorro,
+          meses_bono: e.meses_bono, pct_prima: e.pct_prima, prima_vacacional: e.prima_vacacional,
+          mant_auto: e.mant_auto, monto_celular: e.monto_celular, celular: e.celular,
+          sgmm: e.sgmm, seguro_vida: e.seguro_vida, comentarios: e.comentarios,
+          costo_real_mens: e.costo_real_mens, costo_real_anual: e.costo_real_anual,
         })),
       },
     ])
@@ -747,7 +777,7 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 {columns.map(col => (
-                  <th key={col.key} className="px-4 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">{col.label}</th>
+                  <th key={col.key} className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap" style={col.thStyle || { color: '#9CA3AF' }}>{col.label}</th>
                 ))}
               </tr>
             </thead>
@@ -761,7 +791,7 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
               {filtered.map(e => (
                 <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   {columns.map(col => (
-                    <td key={col.key} className={`px-4 py-3 ${col.className || 'text-gray-600'}`} style={col.style || {}}>
+                    <td key={col.key} className={`px-3 py-2.5 ${col.className || 'text-gray-600'}`} style={{ ...(col.style || {}), ...(col.tdStyle || {}) }}>
                       {col.render(e)}
                     </td>
                   ))}
@@ -1418,7 +1448,7 @@ function TabuladorPage() {
               familia_puesto: item.f,
               nivel: item.n,
               referencia_comp: item.ref,
-              brinco: null,
+              brinco: item.b,
               limite_inferior: item.inf,
               limite_superior: item.sup,
               rango: `${item.inf} - ${item.sup}`,
@@ -1957,8 +1987,22 @@ export default function Admin() {
             continue
           }
 
+          const MONEY_FIELDS = new Set(['sueldo_bruto','sueldo_neto','gasolina','despensa','fondo_ahorro','prima_vacacional','mant_auto','monto_celular','sgmm','seguro_vida','costo_real_mens','costo_real_anual','punto_medio','dif_pesos'])
+          const PCT_FIELDS = new Set(['pct_prima','dif_pct'])
+          const NUM_FIELDS = new Set(['gente_a_cargo','meses_bono','nivel_tab'])
+
           if (hasMasterData && mappedMaster.id_colaborador) {
-            const masterPayload = Object.fromEntries(Object.entries(mappedMaster).filter(([, value]) => value !== '' && value != null))
+            const masterPayload = Object.fromEntries(
+              Object.entries(mappedMaster)
+                .filter(([, value]) => value !== '' && value != null)
+                .map(([key, value]) => {
+                  if (MONEY_FIELDS.has(key)) return [key, parseMoneyLike(value)]
+                  if (PCT_FIELDS.has(key)) return [key, parsePercentLike(value)]
+                  if (NUM_FIELDS.has(key)) return [key, value != null ? Number(String(value).replace(/[^\d.-]/g, '')) || null : null]
+                  return [key, value]
+                })
+                .filter(([, v]) => v !== null && v !== '')
+            )
             const { data: ex, error: lookupError } = await supabase
               .from('empleados')
               .select('id')
