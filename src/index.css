@@ -1,24 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --brand: #201d36;
+    --accent: #9a90f5;
+    --sand: #f6f2ec;
+    --ink: #6e7382;
+    --gold: #f2b56b;
+  }
+
   body {
-    font-family: 'Outfit', sans-serif;
-    background-color: #F4F5F7;
+    font-family: 'Manrope', sans-serif;
+    background: linear-gradient(180deg, #f7f3ee 0%, #f2f3f7 100%);
     color: #111827;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-all cursor-pointer border-none;
+    @apply bg-accent text-white px-4 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer border-none;
+    box-shadow: 0 10px 24px rgba(154, 144, 245, 0.24);
+  }
+  .btn-primary:hover {
+    background-color: #8b80ef;
   }
   .btn-ghost {
     @apply bg-transparent text-gray-500 px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 hover:bg-gray-100 transition-all cursor-pointer;
   }
   .card {
-    @apply bg-white rounded-xl shadow-sm p-5;
+    @apply bg-white rounded-xl p-5;
+    box-shadow: 0 20px 45px rgba(32, 29, 54, 0.08);
   }
   .badge-active   { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800; }
   .badge-onboarding { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800; }

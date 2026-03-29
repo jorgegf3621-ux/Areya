@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Admin from './pages/Admin'
 import Formulario from './pages/Formulario'
 import Portal from './pages/Portal'
@@ -8,7 +8,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Formulario público de ingreso — ruta raíz */}
+        {/* Formulario público de ingreso - ruta raíz */}
         <Route path="/" element={<Formulario />} />
 
         {/* Portal del empleado */}

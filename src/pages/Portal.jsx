@@ -21,9 +21,24 @@ async function portalAuth(action, payload = {}) {
   return data
 }
 
+function AuthShell({ title, subtitle, children }) {
+  return (
+    <div className="min-h-screen bg-brand flex items-center justify-center p-6">
+      <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-sm overflow-hidden">
+        <div className="bg-brand px-8 pt-10 pb-7 text-center">
+          <div className="font-serif text-white text-4xl font-bold leading-none">Areya</div>
+          <div className="text-white/60 text-sm mt-3">{title}</div>
+          {subtitle && <div className="text-white/45 text-xs mt-1">{subtitle}</div>}
+        </div>
+        <div className="px-8 py-8 bg-[#FBFAF8]">{children}</div>
+      </div>
+    </div>
+  )
+}
+
 export default function Portal() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [screen, setScreen] = useState('email') // email | create_password | login | forgot | reset_password | invalid | token_error | portal
+  const [screen, setScreen] = useState('email')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -59,7 +74,7 @@ export default function Portal() {
           setEmpleado(result.empleado)
           setScreen('reset_password')
         }
-      } catch (e) {
+      } catch {
         setScreen('token_error')
       } finally {
         setLoading(false)
@@ -69,15 +84,15 @@ export default function Portal() {
     loadToken()
   }, [activationToken, resetToken])
 
-  const enterPortal = async (emp) => {
-    const t = await getTasks(emp.id)
+  const enterPortal = async emp => {
+    const nextTasks = await getTasks(emp.id)
     setEmpleado(emp)
-    setTasks(t)
+    setTasks(nextTasks)
     setActiveTab(CATEGORIAS[0])
     setScreen('portal')
-    if (t.length && t.every(task => task.completado)) {
+    if (nextTasks.length && nextTasks.every(task => task.completado)) {
       await markEmpleadoActivoSiOnboardingCompleto(emp.id)
-      setEmpleado(prev => prev ? { ...prev, status: 'Activo' } : emp)
+      setEmpleado(prev => (prev ? { ...prev, status: 'Activo' } : emp))
     }
   }
 
@@ -180,13 +195,13 @@ export default function Portal() {
     }
   }
 
-  const handleComplete = async (taskId) => {
+  const handleComplete = async taskId => {
     await completeTask(taskId)
-    const nextTasks = tasks.map(t => t.id === taskId ? { ...t, completado: true, fecha_completado: new Date().toISOString() } : t)
+    const nextTasks = tasks.map(t => (t.id === taskId ? { ...t, completado: true, fecha_completado: new Date().toISOString() } : t))
     setTasks(nextTasks)
     if (nextTasks.length && nextTasks.every(task => task.completado)) {
       await markEmpleadoActivoSiOnboardingCompleto(empleado.id)
-      setEmpleado(prev => prev ? { ...prev, status: 'Activo' } : prev)
+      setEmpleado(prev => (prev ? { ...prev, status: 'Activo' } : prev))
     }
   }
 
@@ -199,175 +214,146 @@ export default function Portal() {
     setSearchParams({})
   }
 
+  const inputCls = 'px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100 w-full'
+
   if (screen === 'email') return (
-    <div className="min-h-screen bg-brand flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="bg-brand px-8 pt-8 pb-6 text-center">
-          <div className="font-serif text-white text-2xl font-bold">Areya</div>
-          <div className="text-white/50 text-sm mt-1">Portal de onboarding</div>
+    <AuthShell title="Portal de onboarding">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Correo corporativo</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="tu.nombre@areya.com.mx"
+            className={inputCls}
+            onKeyDown={e => e.key === 'Enter' && submitEmail()}
+          />
         </div>
-        <div className="px-8 py-7">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Correo corporativo</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="tu.nombre@areya.com.mx"
-                className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100"
-                onKeyDown={e => e.key === 'Enter' && submitEmail()}
-              />
-            </div>
-            <div className="text-xs text-gray-400 leading-relaxed">
-              Primero validaremos tu correo. Si es tu primer acceso, te pediremos crear tu contraseña.
-            </div>
-            {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
-            {message && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{message}</div>}
-            <button onClick={submitEmail} disabled={loading || !email.trim()} className="btn-primary w-full py-2.5 mt-1 disabled:opacity-60">
-              {loading ? 'Verificando...' : 'Continuar →'}
-            </button>
-          </div>
+        <div className="text-xs text-gray-400 leading-relaxed">
+          Primero validaremos tu correo. Si es tu primer acceso, te pediremos crear tu contraseña.
         </div>
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
+        {message && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{message}</div>}
+        <button onClick={submitEmail} disabled={loading || !email.trim()} className="btn-primary w-full py-2.5 mt-1 disabled:opacity-60">
+          {loading ? 'Verificando...' : 'Continuar →'}
+        </button>
       </div>
-    </div>
+    </AuthShell>
   )
 
   if (screen === 'create_password' || screen === 'reset_password') return (
-    <div className="min-h-screen bg-brand flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="bg-brand px-8 pt-8 pb-6 text-center">
-          <div className="font-serif text-white text-2xl font-bold">{screen === 'create_password' ? 'Activa tu acceso' : 'Restablece tu contraseña'}</div>
-          <div className="text-white/50 text-sm mt-1">{email}</div>
+    <AuthShell
+      title={screen === 'create_password' ? 'Activa tu acceso' : 'Restablece tu contraseña'}
+      subtitle={email}
+    >
+      <div className="flex flex-col gap-4">
+        <div className="text-sm text-gray-500 leading-relaxed">
+          {screen === 'create_password'
+            ? 'Este es tu primer acceso al portal. Crea una contraseña para continuar con tu onboarding.'
+            : 'Crea una nueva contraseña para recuperar tu acceso al portal.'}
         </div>
-        <div className="px-8 py-7 flex flex-col gap-4">
-          <div className="text-sm text-gray-500 leading-relaxed">
-            {screen === 'create_password'
-              ? 'Este es tu primer acceso al portal. Crea una contraseña para continuar con tu onboarding.'
-              : 'Crea una nueva contraseña para recuperar tu acceso al portal.'}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nueva contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100"
-            />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Confirmar contraseña</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={e => setConfirmPassword(e.target.value)}
-              className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100"
-              onKeyDown={e => e.key === 'Enter' && (screen === 'create_password' ? submitCreatePassword() : submitResetPassword())}
-            />
-          </div>
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
-          <button
-            onClick={screen === 'create_password' ? submitCreatePassword : submitResetPassword}
-            disabled={loading || !password || !confirmPassword}
-            className="btn-primary w-full py-2.5 disabled:opacity-60"
-          >
-            {loading ? 'Guardando...' : screen === 'create_password' ? 'Crear contraseña y entrar' : 'Actualizar contraseña'}
-          </button>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Nueva contraseña</label>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} className={inputCls} />
         </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Confirmar contraseña</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            className={inputCls}
+            onKeyDown={e => e.key === 'Enter' && (screen === 'create_password' ? submitCreatePassword() : submitResetPassword())}
+          />
+        </div>
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
+        <button
+          onClick={screen === 'create_password' ? submitCreatePassword : submitResetPassword}
+          disabled={loading || !password || !confirmPassword}
+          className="btn-primary w-full py-2.5 disabled:opacity-60"
+        >
+          {loading ? 'Guardando...' : screen === 'create_password' ? 'Crear contraseña y entrar' : 'Actualizar contraseña'}
+        </button>
       </div>
-    </div>
+    </AuthShell>
   )
 
   if (screen === 'login') return (
-    <div className="min-h-screen bg-brand flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="bg-brand px-8 pt-8 pb-6 text-center">
-          <div className="font-serif text-white text-2xl font-bold">Areya</div>
-          <div className="text-white/50 text-sm mt-1">Portal de onboarding</div>
+    <AuthShell title="Portal de onboarding">
+      <div className="flex flex-col gap-4">
+        <div className="bg-white rounded-lg px-3 py-2.5 text-sm text-gray-700 font-mono border border-gray-200">{email}</div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Contraseña</label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            className={inputCls}
+            onKeyDown={e => e.key === 'Enter' && submitLogin()}
+          />
         </div>
-        <div className="px-8 py-7 flex flex-col gap-4">
-          <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-700 font-mono">{email}</div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Contraseña</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100"
-              onKeyDown={e => e.key === 'Enter' && submitLogin()}
-            />
-          </div>
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
-          {message && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{message}</div>}
-          <button onClick={submitLogin} disabled={loading || !password} className="btn-primary w-full py-2.5 disabled:opacity-60">
-            {loading ? 'Entrando...' : 'Entrar al portal'}
-          </button>
-          <button onClick={() => { setScreen('forgot'); setError(''); setMessage('') }} className="text-xs text-gray-500 hover:text-gray-700">
-            {'Olvid\u00e9 contrase\u00f1a'}
-          </button>
-          <button onClick={resetToEmail} className="text-xs text-gray-500 hover:text-gray-700">
-            Usar otro correo
-          </button>
-        </div>
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
+        {message && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{message}</div>}
+        <button onClick={submitLogin} disabled={loading || !password} className="btn-primary w-full py-2.5 disabled:opacity-60">
+          {loading ? 'Entrando...' : 'Entrar al portal'}
+        </button>
+        <button onClick={() => { setScreen('forgot'); setError(''); setMessage('') }} className="text-xs text-gray-500 hover:text-gray-700 text-left">
+          Olvidé contraseña
+        </button>
+        <button onClick={resetToEmail} className="text-xs text-gray-500 hover:text-gray-700 text-left">
+          Usar otro correo
+        </button>
       </div>
-    </div>
+    </AuthShell>
   )
 
   if (screen === 'forgot') return (
-    <div className="min-h-screen bg-brand flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-        <div className="bg-brand px-8 pt-8 pb-6 text-center">
-          <div className="font-serif text-white text-2xl font-bold">Recuperar acceso</div>
-          <div className="text-white/50 text-sm mt-1">Portal de onboarding</div>
+    <AuthShell title="Recuperar acceso" subtitle="Portal de onboarding">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Correo corporativo</label>
+          <input
+            type="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className={inputCls}
+            onKeyDown={e => e.key === 'Enter' && submitForgot()}
+          />
         </div>
-        <div className="px-8 py-7 flex flex-col gap-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Correo corporativo</label>
-            <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              className="px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-indigo-100"
-              onKeyDown={e => e.key === 'Enter' && submitForgot()}
-            />
-          </div>
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
-          {message && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{message}</div>}
-          <button onClick={submitForgot} disabled={loading || !email.trim()} className="btn-primary w-full py-2.5 disabled:opacity-60">
-            {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
-          </button>
-          <button onClick={() => { setScreen('login'); setError(''); setMessage('') }} className="text-xs text-gray-500 hover:text-gray-700">
-            Volver al inicio de sesión
-          </button>
-        </div>
+        {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
+        {message && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{message}</div>}
+        <button onClick={submitForgot} disabled={loading || !email.trim()} className="btn-primary w-full py-2.5 disabled:opacity-60">
+          {loading ? 'Enviando...' : 'Enviar enlace de recuperación'}
+        </button>
+        <button onClick={() => { setScreen('login'); setError(''); setMessage('') }} className="text-xs text-gray-500 hover:text-gray-700 text-left">
+          Volver al inicio de sesión
+        </button>
       </div>
-    </div>
+    </AuthShell>
   )
 
   if (screen === 'invalid' || screen === 'token_error') return (
-    <div className="min-h-screen bg-brand flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-sm w-full text-center">
+    <AuthShell title={screen === 'invalid' ? 'Correo no válido' : 'Enlace no disponible'}>
+      <div className="text-center">
         <div className="text-4xl mb-4">{screen === 'invalid' ? '🔍' : '⏳'}</div>
-        <h2 className="font-serif text-xl font-bold text-brand mb-2">
-          {screen === 'invalid' ? 'Correo no válido' : 'Enlace no disponible'}
-        </h2>
-        <p className="text-gray-500 text-sm mb-6">
+        <p className="text-gray-500 text-sm mb-6 leading-relaxed">
           {screen === 'invalid'
             ? `No encontramos ${email} con acceso al portal. Verifica con RRHH que tu onboarding ya esté configurado.`
             : 'Este enlace ya expiró o no es válido. Solicita a RRHH que te reenvíe tu acceso o genera uno nuevo de recuperación.'}
         </p>
         <button onClick={resetToEmail} className="btn-primary">← Volver</button>
       </div>
-    </div>
+    </AuthShell>
   )
 
   const tasksByTab = tasks.filter(t => t.categoria === activeTab)
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F5F2EC]">
       <div className="bg-brand text-white px-6 py-4 flex items-center justify-between">
         <div>
-          <div className="font-serif text-lg font-bold">Areya</div>
+          <div className="font-serif text-xl font-bold">Areya</div>
           <div className="text-white/50 text-xs">Portal de onboarding</div>
         </div>
         <div className="text-right">
@@ -386,7 +372,7 @@ export default function Portal() {
                 cy="36"
                 r="30"
                 fill="none"
-                stroke="#4F46E5"
+                stroke="#9A90F5"
                 strokeWidth="6"
                 strokeDasharray={`${2 * Math.PI * 30}`}
                 strokeDashoffset={`${2 * Math.PI * 30 * (1 - progress / 100)}`}
@@ -398,15 +384,15 @@ export default function Portal() {
             <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-brand">{progress}%</span>
           </div>
           <div className="flex-1">
-            <div className="font-serif text-lg font-bold text-brand">
-              {progress === 100 ? '¡Onboarding completo!' : 'Tu onboarding en progreso'}
+            <div className="font-serif text-2xl font-bold text-brand">
+              {progress === 100 ? '¡Onboarding completo!' : 'Tu onboarding va en progreso'}
             </div>
             <div className="text-gray-500 text-sm mt-1">
               {tasks.filter(t => t.completado).length} de {tasks.length} actividades completadas
             </div>
             {progress === 100 && (
               <div className="mt-2 text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg px-3 py-1.5 inline-block">
-                Tu estatus ya quedó actualizado a Activo ✓
+                Tu estatus ya quedó actualizado a Activo.
               </div>
             )}
           </div>
@@ -422,7 +408,7 @@ export default function Portal() {
                 onClick={() => setActiveTab(cat)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === cat ? 'bg-accent text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-accent'}`}
               >
-                {cat} {total > 0 && <span className={`ml-1 ${done === total ? 'text-emerald-400' : ''}`}>{done}/{total}</span>}
+                {cat} {total > 0 && <span className={`ml-1 ${done === total ? 'text-emerald-300' : ''}`}>{done}/{total}</span>}
               </button>
             )
           })}
@@ -430,16 +416,21 @@ export default function Portal() {
 
         <div className="flex flex-col gap-3">
           {tasksByTab.length === 0 && (
-            <div className="card text-center text-gray-400 text-sm py-8">No hay actividades en esta categoría</div>
+            <div className="card text-center text-gray-400 text-sm py-8">No hay actividades en esta categoría.</div>
           )}
           {tasksByTab.map(task => (
             <div key={task.id} className={`card flex items-start gap-4 transition-all ${task.completado ? 'opacity-60' : ''}`}>
               <button
                 onClick={() => !task.completado && handleComplete(task.id)}
-                className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all
-                  ${task.completado ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 hover:border-accent cursor-pointer'}`}
+                className={`mt-0.5 w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${
+                  task.completado ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-300 hover:border-accent cursor-pointer'
+                }`}
               >
-                {task.completado && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                {task.completado && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
               </button>
               <div className="flex-1">
                 <div className={`text-sm font-semibold ${task.completado ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.titulo}</div>

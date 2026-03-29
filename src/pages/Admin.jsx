@@ -13,21 +13,21 @@ import { TABULADOR, calcCompensacion } from '../lib/tabulador'
 import Chart from 'chart.js/auto'
 import * as XLSX from 'xlsx'
 
-// â”€â”€â”€ CONSTANTS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Constants
 
 const MASTER_COL_MAP = {
   'id colaborador':'id_colaborador','status':'status','uen':'uen','razon social':'razon_social',
   'nombre':'nombre','apellido paterno':'ap_pat','ap. paterno':'ap_pat','apellido materno':'ap_mat','ap. materno':'ap_mat',
-  'fecha de nacimiento':'fecha_nac','fecha nacimiento':'fecha_nac','genero':'genero','gÃ©nero':'genero',
+  'fecha de nacimiento':'fecha_nac','fecha nacimiento':'fecha_nac','genero':'genero','género':'genero',
   'estado civil':'estado_civil','nacionalidad':'nacionalidad','rfc':'rfc','curp':'curp','nss':'nss',
-  'direccion':'direccion','direcciÃ³n':'direccion','municipio':'municipio',
+  'direccion':'direccion','dirección':'direccion','municipio':'municipio',
   'fecha de ingreso':'fecha_ingreso','fecha ingreso':'fecha_ingreso',
-  'departamento':'departamento','area':'departamento','Ã¡rea':'departamento',
+  'departamento':'departamento','area':'departamento','área':'departamento',
   'cargo':'cargo','puesto':'cargo','tipo de contrato':'tipo_contrato','tipo contrato':'tipo_contrato',
   'jefe directo':'jefe_directo','supervisor':'jefe_directo',
   'email corporativo':'email_corporativo','correo corporativo':'email_corporativo',
   'fecha termino':'fecha_termino','razon de termino':'razon_termino',
-  'antiguedad':'antiguedad','antigÃ¼edad':'antiguedad',
+  'antiguedad':'antiguedad','antigüedad':'antiguedad',
   'familia de puesto':'familia_puesto','nivel tab':'nivel_tab','nivel':'nivel_tab',
   'gente a cargo':'gente_a_cargo','sueldo bruto':'sueldo_bruto','sueldo neto':'sueldo_neto',
   'gasolina':'gasolina','despensa':'despensa','fondo de ahorro':'fondo_ahorro',
@@ -39,8 +39,8 @@ const MASTER_COL_MAP = {
 }
 
 const TAREAS_COL_MAP = {
-  'nivel':'nivel','categoria':'categoria','categorÃ­a':'categoria',
-  'titulo':'titulo','tÃ­tulo':'titulo','descripcion':'descripcion','descripciÃ³n':'descripcion','orden':'orden',
+  'nivel':'nivel','categoria':'categoria','categoría':'categoria',
+  'titulo':'titulo','título':'titulo','descripcion':'descripcion','descripción':'descripcion','orden':'orden',
 }
 
 const STATUS_CLS = {
@@ -52,12 +52,12 @@ const STATUS_CLS = {
 }
 
 const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-const BRAND = '#1A1A2E'
-const ACCENT = '#4F46E5'
+const BRAND = '#201D36'
+const ACCENT = '#9A90F5'
 const CHART_COLORS = [ACCENT,'#10B981','#F59E0B','#EF4444','#8B5CF6','#06B6D4','#EC4899','#EA580C']
 const OFFBOARDING_REASON_TYPES = {
   Voluntaria: [
-    'Mejor oferta econÃ³mica',
+    'Mejor oferta económica',
     'Mejor oportunidad de crecimiento',
     'Cambio de industria o carrera',
     'Motivos personales',
@@ -68,33 +68,33 @@ const OFFBOARDING_REASON_TYPES = {
     'Emprendimiento',
     'Inconformidad con liderazgo',
     'Inconformidad con ambiente laboral',
-    'Inconformidad con compensaciÃ³n',
+    'Inconformidad con compensación',
     'Inconformidad con carga de trabajo',
     'Falta de desarrollo profesional',
     'Falta de flexibilidad laboral',
   ],
   Involuntaria: [
-    'Bajo desempeÃ±o',
-    'Incumplimiento de polÃ­ticas',
+    'Bajo desempeño',
+    'Incumplimiento de políticas',
     'Reestructura organizacional',
-    'EliminaciÃ³n de puesto',
+    'Eliminación de puesto',
     'Fin de contrato temporal',
     'Ausentismo',
     'Falta grave o conducta inapropiada',
     'Abandono de trabajo',
-    'No aprobaciÃ³n de periodo de prueba',
+    'No aprobación de periodo de prueba',
     'Ajuste presupuestal',
   ],
   Mutua: [
-    'SeparaciÃ³n por acuerdo mutuo',
-    'ReubicaciÃ³n no viable',
+    'Separación por acuerdo mutuo',
+    'Reubicación no viable',
     'Cambio de rol no aceptado',
     'Cierre de proyecto',
     'Condiciones laborales no compatibles',
   ],
 }
 
-// â”€â”€â”€ UTILITIES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Utilities
 
 function normalizeKey(k) { return k.toString().toLowerCase().trim().replace(/\s+/g,' ') }
 function mapRow(row, colMap) {
@@ -102,8 +102,8 @@ function mapRow(row, colMap) {
   Object.entries(row).forEach(([k,v]) => { const db = colMap[normalizeKey(k)]; if (db) out[db] = v==='' ? null : v })
   return out
 }
-const fmt = n => n != null ? '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}) : 'â€”'
-const fmtDate = d => { if(!d) return 'â€”'; try { return new Date(d+'T12:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) } catch { return d } }
+const fmt = n => n != null ? '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0}) : '—'
+const fmtDate = d => { if(!d) return '—'; try { return new Date(d+'T12:00').toLocaleDateString('es-MX',{day:'2-digit',month:'short',year:'numeric'}) } catch { return d } }
 const yrsDiff = d => d ? (Date.now()-new Date(d).getTime())/(1000*60*60*24*365.25) : 0
 
 async function adminAuth(action, payload = {}) {
@@ -146,7 +146,7 @@ const BASE_OPTS = {
 function KpiCard({ label, value, sub, color = BRAND }) {
   return (
     <div className="bg-white rounded-xl shadow-sm p-4" style={{ borderLeft: `3px solid ${color}` }}>
-      <div className="font-serif text-2xl font-bold leading-none" style={{ color }}>{value ?? 'â€”'}</div>
+      <div className="font-serif text-2xl font-bold leading-none" style={{ color }}>{value ?? '—'}</div>
       <div className="text-gray-500 text-xs mt-1.5">{label}</div>
       {sub && <div className="text-xs mt-1 font-semibold" style={{ color }}>{sub}</div>}
     </div>
@@ -244,22 +244,22 @@ function PersonalTab({ stats }) {
             { label: 'Headcount activo', value: stats.headcount, bg: BRAND },
             { label: '% ingresos 2025', value: stats.pctIngr2025+'%', bg: '#EA580C' },
             { label: '% ingresos 2026', value: stats.pctIngr2026+'%', bg: '#EA580C' },
-            { label: 'Prom. antigÃ¼edad (aÃ±os)', value: stats.avgAntig, bg: '#0F766E' },
-            { label: 'Prom. edad (aÃ±os)', value: stats.avgEdad, bg: '#0F766E' },
+            { label: 'Prom. antigüedad (años)', value: stats.avgAntig, bg: '#0F766E' },
+            { label: 'Prom. edad (años)', value: stats.avgEdad, bg: '#0F766E' },
           ].map(({ label, value, bg }) => (
             <div key={label} className="rounded-xl p-3.5" style={{ background: bg }}>
-              <div className="font-serif text-2xl font-bold text-white leading-none">{value ?? 'â€”'}</div>
+              <div className="font-serif text-2xl font-bold text-white leading-none">{value ?? '—'}</div>
               <div className="text-white/60 text-xs mt-1">{label}</div>
             </div>
           ))}
         </div>
         <ChartCard title="Generaciones Areya"><div style={{ height: 190, position: 'relative' }}><canvas ref={genRef} /></div></ChartCard>
-        <ChartCard title="GÃ©nero"><div style={{ height: 190, position: 'relative' }}><canvas ref={gen2Ref} /></div></ChartCard>
+        <ChartCard title="Género"><div style={{ height: 190, position: 'relative' }}><canvas ref={gen2Ref} /></div></ChartCard>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
         <ChartCard title="Headcount por UEN"><div style={{ height: 190, position: 'relative' }}><canvas ref={uenRef} /></div></ChartCard>
-        <ChartCard title="AntigÃ¼edad en la empresa"><div style={{ height: 190, position: 'relative' }}><canvas ref={antRef} /></div></ChartCard>
+        <ChartCard title="Antigüedad en la empresa"><div style={{ height: 190, position: 'relative' }}><canvas ref={antRef} /></div></ChartCard>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -269,11 +269,11 @@ function PersonalTab({ stats }) {
           <div className="text-gray-400 text-xs mt-1">colaboradores</div>
         </div>
         <div className="bg-white rounded-xl shadow-sm p-5 text-center">
-          <div className="font-serif text-sm font-bold mb-2">MÃ¡s de 6 meses</div>
+          <div className="font-serif text-sm font-bold mb-2">Más de 6 meses</div>
           <div className="font-serif text-4xl font-bold" style={{ color: '#10B981' }}>{stats.mas6m}</div>
           <div className="text-gray-400 text-xs mt-1">colaboradores</div>
         </div>
-        <ChartCard title="DistribuciÃ³n por Ã¡rea"><div style={{ height: 150, position: 'relative' }}><canvas ref={areaRef} /></div></ChartCard>
+        <ChartCard title="Distribución por área"><div style={{ height: 150, position: 'relative' }}><canvas ref={areaRef} /></div></ChartCard>
       </div>
     </div>
   )
@@ -319,7 +319,7 @@ function FinanzasTab({ stats }) {
 
       {/* Charts */}
       <div className="grid grid-cols-2 gap-4 mb-5">
-        <ChartCard title="DistribuciÃ³n de costos">
+        <ChartCard title="Distribución de costos">
           <div style={{ height: 190, position: 'relative' }}><canvas ref={distRef} /></div>
         </ChartCard>
         <div className="bg-white rounded-xl shadow-sm p-4">
@@ -327,7 +327,7 @@ function FinanzasTab({ stats }) {
           <div className="flex flex-col gap-2">
             {[...active].sort((a,b) => (b.costo_real_mens||0)-(a.costo_real_mens||0)).slice(0,5).map(e => (
               <div key={e.id} className="flex items-center justify-between text-sm">
-                <span className="text-gray-700 truncate max-w-48">{e.nombre_completo || 'â€”'}</span>
+                <span className="text-gray-700 truncate max-w-48">{e.nombre_completo || '—'}</span>
                 <span className="font-bold text-emerald-600 ml-2 flex-shrink-0">{fmt(e.costo_real_mens)}</span>
               </div>
             ))}
@@ -342,7 +342,7 @@ function FinanzasTab({ stats }) {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-gray-50">
-                {['Colaborador','Sueldo bruto','Beneficios','Costo real/mes','Costo real/aÃ±o'].map(h => (
+                {['Colaborador','Sueldo bruto','Beneficios','Costo real/mes','Costo real/año'].map(h => (
                   <th key={h} className="px-3 py-2 text-left font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap border-b border-gray-100">{h}</th>
                 ))}
               </tr>
@@ -364,7 +364,7 @@ function FinanzasTab({ stats }) {
                 )
               })}
               {active.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-6 text-gray-400">Sin datos de compensaciÃ³n en el master</td></tr>
+                <tr><td colSpan={5} className="text-center py-6 text-gray-400">Sin datos de compensación en el master</td></tr>
               )}
             </tbody>
           </table>
@@ -418,9 +418,9 @@ function AttritionTab({ stats }) {
   return (
     <div>
       <div className="grid grid-cols-4 gap-3 mb-5">
-        <KpiCard label="Bajas este aÃ±o" value={stats.bajasAnio} color="#EF4444" />
-        <KpiCard label="Tasa de rotaciÃ³n" value={stats.tasaRot + '%'} color="#F59E0B" sub="Prom. industria: 8%" />
-        <KpiCard label="AntigÃ¼edad prom. al salir" value={stats.avgAntigSalida + ' aÃ±os'} color="#10B981" />
+        <KpiCard label="Bajas este año" value={stats.bajasAnio} color="#EF4444" />
+        <KpiCard label="Tasa de rotación" value={stats.tasaRot + '%'} color="#F59E0B" sub="Prom. industria: 8%" />
+        <KpiCard label="Antigüedad prom. al salir" value={stats.avgAntigSalida + ' años'} color="#10B981" />
         <KpiCard label="Offboardings activos" value={stats.offboarding} color={ACCENT} />
       </div>
 
@@ -430,7 +430,7 @@ function AttritionTab({ stats }) {
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <ChartCard title="Bajas por Ã¡rea"><div style={{ height: 180, position: 'relative' }}><canvas ref={bajasDeptRef} /></div></ChartCard>
+        <ChartCard title="Bajas por área"><div style={{ height: 180, position: 'relative' }}><canvas ref={bajasDeptRef} /></div></ChartCard>
         <div className="bg-white rounded-xl shadow-sm p-4">
           <div className="font-serif text-sm font-bold mb-3">Historial de bajas</div>
           {stats.inactivos_list.length === 0
@@ -439,9 +439,9 @@ function AttritionTab({ stats }) {
               <div key={e.id} className="flex items-start justify-between py-2.5 border-b border-gray-50 last:border-0 text-sm">
                 <div>
                   <div className="font-semibold">{e.nombre_completo}</div>
-                  <div className="text-gray-400 text-xs">{e.departamento} Â· {fmtDate(e.fecha_termino)}</div>
+                  <div className="text-gray-400 text-xs">{e.departamento} · {fmtDate(e.fecha_termino)}</div>
                 </div>
-                <span className="text-xs text-red-600 font-medium ml-2 flex-shrink-0">{e.razon_termino || 'â€”'}</span>
+                <span className="text-xs text-red-600 font-medium ml-2 flex-shrink-0">{e.razon_termino || '—'}</span>
               </div>
             ))
           }
@@ -475,7 +475,7 @@ function OnboardingTabDash({ stats }) {
               </div>
               <div className="flex-1">
                 <div className="text-sm font-semibold">{e.nombre_completo}</div>
-                <div className="text-xs text-gray-400">{e.cargo} Â· {e.departamento}</div>
+                    <div className="text-xs text-gray-400">{e.cargo} · {e.departamento}</div>
               </div>
               <div className="text-xs text-gray-400">Ingreso: {fmtDate(e.fecha_ingreso)}</div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-semibold">Onboarding</span>
@@ -534,7 +534,7 @@ function DashboardPage({ stats, empleados, pendingAdmins, onApproveAdmin, dashTa
       {pendingAdmins.length > 0 && (
         <div className="mb-5 bg-amber-50 border border-amber-200 rounded-xl p-4">
           <div className="font-semibold text-sm text-amber-800 mb-2">
-            ðŸ”” {pendingAdmins.length} solicitud{pendingAdmins.length > 1 ? 'es' : ''} de acceso al panel
+            🔔 {pendingAdmins.length} solicitud{pendingAdmins.length > 1 ? 'es' : ''} de acceso al panel
           </div>
           {pendingAdmins.map(r => (
             <div key={r.id} className="flex items-center justify-between py-2 border-t border-amber-200">
@@ -542,7 +542,7 @@ function DashboardPage({ stats, empleados, pendingAdmins, onApproveAdmin, dashTa
               <button onClick={() => onApproveAdmin(r.id, r.email)}
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all"
                 style={{ background: '#10B981', color: '#fff' }}>
-                âœ“ Aprobar acceso
+                ✓ Aprobar acceso
               </button>
             </div>
           ))}
@@ -617,7 +617,7 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
           {['Pendiente','Activo','Onboarding','Offboarding','Inactivo'].map(s => <option key={s}>{s}</option>)}
         </select>
         <button onClick={exportMaster} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">Descargar Excel</button>
-        <button onClick={onLoad} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">â†» Actualizar</button>
+        <button onClick={onLoad} className="px-4 py-2 text-sm font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 transition-all">↻ Actualizar</button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
@@ -634,17 +634,17 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
               {loading && <tr><td colSpan={10} className="text-center py-10 text-gray-400">Cargando...</td></tr>}
               {!loading && filtered.length === 0 && (
                 <tr><td colSpan={10} className="text-center py-10 text-gray-400">
-                  {empleados.length === 0 ? 'No hay registros. Importa el master para comenzar.' : 'Sin resultados para esa bÃºsqueda.'}
+                  {empleados.length === 0 ? 'No hay registros. Importa el master para comenzar.' : 'Sin resultados para esa búsqueda.'}
                 </td></tr>
               )}
               {filtered.map(e => (
                 <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-400 font-mono">{e.id_colaborador}</td>
                   <td className="px-4 py-3 font-semibold whitespace-nowrap" style={{ color: ACCENT }}>{e.nombre_completo}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{e.rfc || 'â€”'}</td>
-                  <td className="px-4 py-3 text-gray-600">{e.departamento || 'â€”'}</td>
-                  <td className="px-4 py-3 text-gray-600 max-w-36 truncate">{e.cargo || 'â€”'}</td>
-                  <td className="px-4 py-3 font-mono text-xs" style={{ color: ACCENT }}>{e.email_corporativo || 'â€”'}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{e.rfc || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600">{e.departamento || '—'}</td>
+                  <td className="px-4 py-3 text-gray-600 max-w-36 truncate">{e.cargo || '—'}</td>
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: ACCENT }}>{e.email_corporativo || '—'}</td>
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(e.fecha_ingreso)}</td>
                   <td className="px-4 py-3 text-xs font-semibold">{fmt(e.sueldo_bruto)}</td>
                   <td className="px-4 py-3 text-xs font-bold text-emerald-700">{fmt(e.costo_real_mens)}</td>
@@ -684,23 +684,23 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
           <div className="text-sm text-gray-600">
             <strong className="text-gray-800">Columna requerida:</strong>{' '}
             <code className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded text-xs">ID Colaborador</code>
-            <span className="text-xs text-gray-500 block mt-1">Carga completa o actualizaciÃ³n parcial. Celdas vacÃ­as â†’ null.</span>
+            <span className="text-xs text-gray-500 block mt-1">Carga completa o actualización parcial. Celdas vacías → null.</span>
           </div>
         ) : (
           <div className="text-sm text-gray-600">
             Columnas: {['nivel','categoria','titulo','descripcion','orden'].map(c => (
               <code key={c} className="bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded text-xs mr-1">{c}</code>
             ))}
-            <button onClick={onDownloadTemplate} className="block text-xs text-purple-600 underline mt-1">â¬‡ Descargar plantilla</button>
+            <button onClick={onDownloadTemplate} className="block text-xs text-purple-600 underline mt-1">⬇ Descargar plantilla</button>
           </div>
         )}
       </div>
 
       {!importData && !importLog && (
         <label className="block border-2 border-dashed border-gray-200 rounded-xl p-10 text-center cursor-pointer hover:border-indigo-400 hover:bg-indigo-50/50 transition-all">
-          <div className="text-3xl mb-3">ðŸ“‚</div>
+          <div className="text-3xl mb-3">📂</div>
           <div className="text-sm font-semibold text-gray-700 mb-1">Arrastra o haz clic para subir</div>
-          <div className="text-xs text-gray-400">.xlsx Â· .xls Â· .csv</div>
+          <div className="text-xs text-gray-400">.xlsx · .xls · .csv</div>
           <input type="file" accept=".xlsx,.xls,.csv" className="hidden"
             onChange={e => e.target.files[0] && onProcess(e.target.files[0], importTab)} />
         </label>
@@ -728,7 +728,7 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
             <button onClick={onRun} disabled={importing}
               className="px-4 py-2 text-sm font-semibold rounded-lg text-white transition-all disabled:opacity-50"
               style={{ background: ACCENT }}>
-              {importing ? 'Importando...' : `Importar ${importData.rows.length} filas â†’`}
+              {importing ? 'Importando...' : `Importar ${importData.rows.length} filas →`}
             </button>
           </div>
         </div>
@@ -747,12 +747,12 @@ function ImportPage({ importTab, setImportTab, importData, setImportData, import
           </div>
           <div className="bg-gray-50 rounded-lg p-3 max-h-48 overflow-y-auto font-mono text-xs leading-relaxed">
             {importLog.lines.map((l,i) => (
-              <div key={i} className={l.startsWith('âœ“')||l.startsWith('+') ? 'text-emerald-700' : l.startsWith('âš ') ? 'text-amber-600' : 'text-red-600'}>{l}</div>
+              <div key={i} className={l.startsWith('✓')||l.startsWith('+') ? 'text-emerald-700' : l.startsWith('⚠') ? 'text-amber-600' : 'text-red-600'}>{l}</div>
             ))}
           </div>
           <button onClick={() => { setImportData(null); setImportLog(null) }}
             className="mt-3 w-full py-2 text-sm font-medium rounded-lg border border-gray-200 hover:bg-gray-50">
-            Nueva importaciÃ³n
+            Nueva importación
           </button>
         </div>
       )}
@@ -1232,7 +1232,7 @@ function TabuladorPage() {
           Descargar Excel
         </button>
       </div>
-      MÃ³dulo de tabulador â€” conecta con la tabla <code className="bg-gray-100 px-1.5 rounded text-xs">tabulador</code> en Supabase.<br />
+      Módulo de tabulador - conecta con la tabla <code className="bg-gray-100 px-1.5 rounded text-xs">tabulador</code> en Supabase.<br />
       Importa tu tabulador desde <span className="font-semibold text-gray-700">Importar datos</span>.
     </div>
   )
@@ -1309,7 +1309,7 @@ export default function Admin() {
     try {
       const { data } = await supabase.from('solicitudes_admin').select('*').eq('status', 'pending').order('requested_at', { ascending: false })
       setPendingAdmins(data || [])
-    } catch { /* tabla puede no existir aÃºn */ }
+    } catch { /* tabla puede no existir aún */ }
   }
 
   const loadOffboardingPendientes = async () => {
@@ -1393,7 +1393,7 @@ export default function Admin() {
     const genTotal = genPct.reduce((a,b) => a+b, 1)
     const genPctFinal = genPct.map(n => +(n / genTotal * 100).toFixed(1))
 
-    // GÃ©nero, UEN, Departamento
+    // Género, UEN, Departamento
     const countBy = (arr, key) => {
       const m = {}
       arr.forEach(e => { if (e[key]) m[e[key]] = (m[e[key]] || 0) + 1 })
@@ -1403,15 +1403,15 @@ export default function Admin() {
     const uenMap = countBy(activos_ob, 'uen')
     const deptMap = countBy(activos, 'departamento')
 
-    // AntigÃ¼edad buckets
-    const antigMap = { '< 1 aÃ±o': 0, '1-2 aÃ±os': 0, '2-3 aÃ±os': 0, '3-5 aÃ±os': 0, '5+ aÃ±os': 0 }
+    // Antigüedad buckets
+    const antigMap = { '< 1 año': 0, '1-2 años': 0, '2-3 años': 0, '3-5 años': 0, '5+ años': 0 }
     activos.forEach(e => {
       const y = yrsDiff(e.fecha_ingreso)
-      if (y < 1) antigMap['< 1 aÃ±o']++
-      else if (y < 2) antigMap['1-2 aÃ±os']++
-      else if (y < 3) antigMap['2-3 aÃ±os']++
-      else if (y < 5) antigMap['3-5 aÃ±os']++
-      else antigMap['5+ aÃ±os']++
+      if (y < 1) antigMap['< 1 año']++
+      else if (y < 2) antigMap['1-2 años']++
+      else if (y < 3) antigMap['2-3 años']++
+      else if (y < 5) antigMap['3-5 años']++
+      else antigMap['5+ años']++
     })
 
     // Finanzas
@@ -1523,19 +1523,19 @@ export default function Admin() {
 
   if (!user) {
     const brandBg = { background: BRAND }
-    const inputCls = "px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 w-full"
-    const btnPrimary = "w-full py-2.5 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
+    const inputCls = 'px-3 py-2.5 rounded-lg border border-gray-200 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 w-full'
+    const btnPrimary = 'w-full py-2.5 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50'
 
     if (loginStep === 'email') return (
       <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
-            <div className="font-serif text-white text-2xl font-bold">Areya</div>
-            <div className="text-white/50 text-sm mt-1">Panel de administraciÃ³n Â· RRHH</div>
+        <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="px-8 pt-10 pb-7 text-center" style={brandBg}>
+            <div className="font-serif text-white text-4xl font-bold leading-none">Areya</div>
+            <div className="text-white/60 text-sm mt-3">Panel de administración · RRHH</div>
           </div>
-          <div className="px-8 py-7 flex flex-col gap-4">
+          <div className="px-8 py-8 flex flex-col gap-4 bg-[#FBFAF8]">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Correo corporativo</label>
+              <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Correo corporativo</label>
               <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoFocus
                 placeholder="tu.nombre@areya.com.mx"
                 onKeyDown={e => e.key === 'Enter' && handleEmailContinue()}
@@ -1545,7 +1545,7 @@ export default function Admin() {
             {loginMsg && <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 text-sm text-emerald-700">{loginMsg}</div>}
             <button onClick={handleEmailContinue} disabled={!loginEmail.trim()}
               className={btnPrimary} style={{ background: ACCENT }}>
-              Continuar â†’
+              Continuar →
             </button>
           </div>
         </div>
@@ -1554,14 +1554,14 @@ export default function Admin() {
 
     if (loginStep === 'password') return (
       <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
-            <div className="font-serif text-white text-2xl font-bold">Areya</div>
-            <div className="text-white/50 text-sm mt-1">Panel de administraciÃ³n Â· RRHH</div>
+        <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="px-8 pt-10 pb-7 text-center" style={brandBg}>
+            <div className="font-serif text-white text-4xl font-bold leading-none">Areya</div>
+            <div className="text-white/60 text-sm mt-3">Panel de administración · RRHH</div>
           </div>
-          <div className="px-8 py-7 flex flex-col gap-4">
-            <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-3 py-2.5">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center flex-shrink-0">
+          <div className="px-8 py-8 flex flex-col gap-4 bg-[#FBFAF8]">
+            <div className="flex items-center gap-3 bg-white rounded-lg px-3 py-2.5 border border-gray-200">
+              <div className="w-8 h-8 rounded-full text-xs font-bold flex items-center justify-center flex-shrink-0 text-white" style={{ background: ACCENT }}>
                 {loginEmail[0]?.toUpperCase() || '?'}
               </div>
               <span className="text-sm text-gray-700 flex-1 truncate">{loginEmail}</span>
@@ -1571,7 +1571,7 @@ export default function Admin() {
               </button>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">ContraseÃ±a</label>
+              <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Contraseña</label>
               <input type="password" value={loginPass} onChange={e => setLoginPass(e.target.value)} autoFocus
                 onKeyDown={e => e.key === 'Enter' && handlePasswordLogin()}
                 className={inputCls} />
@@ -1584,7 +1584,7 @@ export default function Admin() {
             </button>
             <button onClick={() => { setLoginStep('forgot'); setLoginErr(''); setLoginMsg('') }}
               className="text-xs font-medium hover:underline text-left" style={{ color: ACCENT }}>
-              {'Olvid\u00e9 contrase\u00f1a'}
+              Olvidé contraseña
             </button>
           </div>
         </div>
@@ -1593,14 +1593,14 @@ export default function Admin() {
 
     if (loginStep === 'forgot') return (
       <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
-            <div className="font-serif text-white text-2xl font-bold">Areya</div>
-            <div className="text-white/50 text-sm mt-1">Recuperar acceso al panel</div>
+        <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="px-8 pt-10 pb-7 text-center" style={brandBg}>
+            <div className="font-serif text-white text-4xl font-bold leading-none">Areya</div>
+            <div className="text-white/60 text-sm mt-3">Recuperar acceso al panel</div>
           </div>
-          <div className="px-8 py-7 flex flex-col gap-4">
+          <div className="px-8 py-8 flex flex-col gap-4 bg-[#FBFAF8]">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Correo corporativo</label>
+              <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Correo corporativo</label>
               <input type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} autoFocus
                 onKeyDown={e => e.key === 'Enter' && handleForgotPassword()}
                 className={inputCls} />
@@ -1613,7 +1613,7 @@ export default function Admin() {
             </button>
             <button onClick={() => { setLoginStep('password'); setLoginErr(''); setLoginMsg('') }}
               className="text-xs font-medium hover:underline text-left" style={{ color: ACCENT }}>
-              Volver al inicio de sesiÃ³n
+              Volver al inicio de sesión
             </button>
           </div>
         </div>
@@ -1622,19 +1622,19 @@ export default function Admin() {
 
     if (loginStep === 'reset') return (
       <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
-          <div className="px-8 pt-8 pb-6 text-center" style={brandBg}>
-            <div className="font-serif text-white text-2xl font-bold">Areya</div>
-            <div className="text-white/50 text-sm mt-1">Restablecer contraseÃ±a</div>
+        <div className="bg-white rounded-[28px] shadow-2xl w-full max-w-sm overflow-hidden">
+          <div className="px-8 pt-10 pb-7 text-center" style={brandBg}>
+            <div className="font-serif text-white text-4xl font-bold leading-none">Areya</div>
+            <div className="text-white/60 text-sm mt-3">Restablecer contraseña</div>
           </div>
-          <div className="px-8 py-7 flex flex-col gap-4">
-            <div className="bg-gray-50 rounded-lg px-3 py-2.5 text-sm text-gray-700 font-mono">{loginEmail}</div>
+          <div className="px-8 py-8 flex flex-col gap-4 bg-[#FBFAF8]">
+            <div className="bg-white rounded-lg px-3 py-2.5 text-sm text-gray-700 font-mono border border-gray-200">{loginEmail}</div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Nueva contraseÃ±a</label>
+              <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Nueva contraseña</label>
               <input type="password" value={loginPass} onChange={e => setLoginPass(e.target.value)} autoFocus className={inputCls} />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">Confirmar contraseÃ±a</label>
+              <label className="text-xs font-bold text-[#7A8191] uppercase tracking-wide">Confirmar contraseña</label>
               <input type="password" value={loginPassConfirm} onChange={e => setLoginPassConfirm(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleResetPassword()}
                 className={inputCls} />
@@ -1642,29 +1642,28 @@ export default function Admin() {
             {loginErr && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{loginErr}</div>}
             <button onClick={handleResetPassword} disabled={!loginPass || !loginPassConfirm}
               className={btnPrimary} style={{ background: ACCENT }}>
-              Guardar nueva contraseÃ±a
+              Guardar nueva contraseña
             </button>
           </div>
         </div>
       </div>
     )
 
-    // Pending
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={brandBg}>
-        <div className="bg-white rounded-2xl shadow-2xl p-10 max-w-sm w-full text-center">
-          <div className="text-4xl mb-4">â³</div>
+        <div className="bg-white rounded-[28px] shadow-2xl p-10 max-w-sm w-full text-center">
+          <div className="text-4xl mb-4">⏳</div>
           <h2 className="font-serif text-xl font-bold mb-2" style={{ color: BRAND }}>Acceso pendiente</h2>
           <p className="text-gray-500 text-sm leading-relaxed mb-5">
-            Tu solicitud fue enviada al equipo de RRHH. Cuando sea aprobada, recibirÃ¡s un correo en{' '}
-            <strong className="text-gray-700">{loginEmail}</strong> para crear tu contraseÃ±a.
+            Tu solicitud fue enviada al equipo de RRHH. Cuando sea aprobada, recibirás un correo en{' '}
+            <strong className="text-gray-700">{loginEmail}</strong> para crear tu contraseña.
           </p>
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 mb-5">
-            Tiempo de respuesta habitual: menos de 24 horas
+            Tiempo de respuesta habitual: menos de 24 horas.
           </div>
           <button onClick={() => { setLoginStep('email'); setLoginEmail(''); setLoginErr('') }}
             className="text-sm font-medium hover:underline" style={{ color: ACCENT }}>
-            â† Usar otro correo
+            ← Usar otro correo
           </button>
         </div>
       </div>
@@ -1679,7 +1678,7 @@ export default function Admin() {
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
-      if (!rows.length) { showToast('âš  El archivo estÃ¡ vacÃ­o'); return }
+      if (!rows.length) { showToast('⚠ El archivo está vacío'); return }
       setImportData({ rows, fileName: file.name, type })
       setImportLog(null)
     }
@@ -1695,28 +1694,28 @@ export default function Admin() {
     for (let i = 0; i < rows.length; i++) {
       const mapped = mapRow(rows[i], colMap)
       const keyCol = type === 'master' ? 'id_colaborador' : 'titulo'
-      if (!mapped[keyCol]) { skipped++; lines.push(`âš  Fila ${i+2}: sin ${keyCol}`); continue }
+      if (!mapped[keyCol]) { skipped++; lines.push(`⚠ Fila ${i+2}: sin ${keyCol}`); continue }
       try {
         if (type === 'master') {
           const { data: ex } = await supabase.from('empleados').select('id').eq('id_colaborador', mapped.id_colaborador).single()
-          if (ex) { await updateEmpleado(ex.id, mapped); updated++; lines.push(`âœ“ Actualizado: ${mapped.id_colaborador}`) }
+          if (ex) { await updateEmpleado(ex.id, mapped); updated++; lines.push(`✓ Actualizado: ${mapped.id_colaborador}`) }
           else { await supabase.from('empleados').insert(mapped); inserted++; lines.push(`+ Insertado: ${mapped.id_colaborador}`) }
         } else {
-          await upsertTemplate(mapped); inserted++; lines.push(`âœ“ Tarea: ${mapped.titulo} (${mapped.nivel})`)
+          await upsertTemplate(mapped); inserted++; lines.push(`✓ Tarea: ${mapped.titulo} (${mapped.nivel})`)
         }
-      } catch (err) { skipped++; lines.push(`âœ— Fila ${i+2}: ${err.message?.slice(0,60)}`) }
+      } catch (err) { skipped++; lines.push(`✕ Fila ${i+2}: ${err.message?.slice(0,60)}`) }
     }
     setImportLog({ inserted, updated, skipped, lines })
     setImporting(false)
-    showToast(`âœ“ ImportaciÃ³n completa â€” ${inserted} nuevos Â· ${updated} actualizados`)
+    showToast(`✓ Importación completa - ${inserted} nuevos · ${updated} actualizados`)
     if (type === 'master') loadEmpleados()
   }
 
   const downloadTemplate = () => {
     const data = [
       { nivel: 'Practicante', categoria: 'Previo al ingreso', titulo: 'Firma de contrato', descripcion: '', orden: 1 },
-      { nivel: 'Analista', categoria: 'InducciÃ³n', titulo: 'ReuniÃ³n con el equipo', descripcion: '', orden: 1 },
-      { nivel: 'todos', categoria: 'PolÃ­ticas', titulo: 'CÃ³digo de conducta', descripcion: '', orden: 1 },
+      { nivel: 'Analista', categoria: 'Inducción', titulo: 'Reunión con el equipo', descripcion: '', orden: 1 },
+      { nivel: 'todos', categoria: 'Políticas', titulo: 'Código de conducta', descripcion: '', orden: 1 },
     ]
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()

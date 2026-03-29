@@ -159,16 +159,16 @@ export default async function handler(req, res) {
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
             <div style="background:#1A1A2E;padding:24px 32px;border-radius:12px 12px 0 0">
               <h1 style="color:#fff;font-size:20px;margin:0">Areya</h1>
-              <p style="color:rgba(255,255,255,.5);font-size:13px;margin:4px 0 0">Recuperacion de contrasena</p>
+              <p style="color:rgba(255,255,255,.5);font-size:13px;margin:4px 0 0">Recuperación de contraseña</p>
             </div>
             <div style="background:#fff;border:1px solid #E5E7EB;border-top:none;padding:28px 32px;border-radius:0 0 12px 12px">
               <h2 style="font-size:17px;color:#111827;margin:0 0 12px">Hola, ${nombre}</h2>
               <p style="font-size:14px;color:#374151;margin:0 0 20px;line-height:1.6">
-                Recibimos una solicitud para restablecer tu contrasena del portal de onboarding.
+                Recibimos una solicitud para restablecer tu contraseña del portal de onboarding.
               </p>
               <div style="text-align:center;margin-bottom:24px">
                 <a href="${reset_link}" style="background:#4F46E5;color:#fff;padding:13px 28px;border-radius:9px;text-decoration:none;font-size:15px;font-weight:700;display:inline-block">
-                  Restablecer contrasena ->
+                  Restablecer contraseña →
                 </a>
               </div>
               <p style="font-size:12px;color:#9CA3AF;text-align:center;margin:0">
@@ -191,16 +191,16 @@ export default async function handler(req, res) {
           <div style="font-family:sans-serif;max-width:560px;margin:0 auto">
             <div style="background:#1A1A2E;padding:24px 32px;border-radius:12px 12px 0 0">
               <h1 style="color:#fff;font-size:20px;margin:0">Areya RRHH</h1>
-              <p style="color:rgba(255,255,255,.5);font-size:13px;margin:4px 0 0">Recuperacion de acceso admin</p>
+              <p style="color:rgba(255,255,255,.5);font-size:13px;margin:4px 0 0">Recuperación de acceso admin</p>
             </div>
             <div style="background:#fff;border:1px solid #E5E7EB;border-top:none;padding:28px 32px;border-radius:0 0 12px 12px">
               <h2 style="font-size:17px;color:#111827;margin:0 0 12px">Hola, ${nombre}</h2>
               <p style="font-size:14px;color:#374151;margin:0 0 20px;line-height:1.6">
-                Recibimos una solicitud para restablecer tu contrasena del panel de administracion.
+                Recibimos una solicitud para restablecer tu contraseña del panel de administración.
               </p>
               <div style="text-align:center;margin-bottom:24px">
                 <a href="${reset_link}" style="background:#4F46E5;color:#fff;padding:13px 28px;border-radius:9px;text-decoration:none;font-size:15px;font-weight:700;display:inline-block">
-                  Restablecer contrasena ->
+                  Restablecer contraseña →
                 </a>
               </div>
               <p style="font-size:12px;color:#9CA3AF;text-align:center;margin:0">
