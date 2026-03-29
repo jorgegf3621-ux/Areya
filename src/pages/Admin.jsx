@@ -20,8 +20,8 @@ const ADMIN_SESSION_KEY = 'areya_admin_session'
 // Constants
 
 const MASTER_COL_MAP = {
-  'id colaborador':'id_colaborador','idcolaborador':'id_colaborador','id de colaborador':'id_colaborador','id del colaborador':'id_colaborador',
-  'numero de colaborador':'id_colaborador','no colaborador':'id_colaborador','num colaborador':'id_colaborador','colaborador id':'id_colaborador',
+  'id colaborador':'ID Colaborador','idcolaborador':'ID Colaborador','id de colaborador':'ID Colaborador','id del colaborador':'ID Colaborador',
+  'numero de colaborador':'ID Colaborador','no colaborador':'ID Colaborador','num colaborador':'ID Colaborador','colaborador id':'ID Colaborador',
   'status':'status','uen':'uen','razon social':'razon_social',
   'nombre completo':'nombre_completo','nombre':'nombre','apellido paterno':'ap_pat','ap. paterno':'ap_pat','apellido materno':'ap_mat','ap. materno':'ap_mat',
   'fecha de nacimiento':'fecha_nac','fecha nacimiento':'fecha_nac','genero':'genero','género':'genero',
@@ -29,7 +29,7 @@ const MASTER_COL_MAP = {
   'direccion':'direccion','dirección':'direccion','municipio':'municipio',
   'fecha de ingreso':'fecha_ingreso','fecha ingreso':'fecha_ingreso',
   'departamento':'departamento','area':'departamento','área':'departamento',
-  'cargo':'cargo','puesto':'cargo','tipo de contrato':'tipo_contrato','tipo contrato':'tipo_contrato',
+  'cargo':'Puesto','puesto':'Puesto','tipo de contrato':'Tipo de contratación','tipo contrato':'Tipo de contratación','tipo de contratacion':'Tipo de contratación',
   'jefe directo':'jefe_directo','supervisor':'jefe_directo',
   'email corporativo':'email_corporativo','correo corporativo':'email_corporativo',
   'fecha termino':'fecha_termino','razon de termino':'razon_termino',
@@ -441,7 +441,7 @@ function FinanzasTab({ stats }) {
                   <tr key={e.id} className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-3 py-2.5">
                       <div className="font-semibold text-gray-800">{e.nombre_completo}</div>
-                      <div className="text-gray-400">{e.cargo}</div>
+                      <div className="text-gray-400">{e['Puesto']}</div>
                     </td>
                     <td className="px-3 py-2.5">{fmt(e.sueldo_bruto)}</td>
                     <td className="px-3 py-2.5">{fmt(benef)}</td>
@@ -562,7 +562,7 @@ function OnboardingTabDash({ stats }) {
               </div>
               <div className="flex-1">
                 <div className="text-sm font-semibold">{e.nombre_completo}</div>
-                    <div className="text-xs text-gray-400">{e.cargo} · {e.departamento}</div>
+                    <div className="text-xs text-gray-400">{e['Puesto']} · {e.departamento}</div>
               </div>
               <div className="text-xs text-gray-400">Ingreso: {fmtDate(e.fecha_ingreso)}</div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-semibold">Onboarding</span>
@@ -606,7 +606,7 @@ function DashboardPage({ stats, empleados, pendingAdmins, onApproveAdmin, dashTa
           nombre: e.nombre_completo,
           status: e.status,
           departamento: e.departamento,
-          cargo: e.cargo,
+          'Puesto': e['Puesto'],
           fecha_ingreso: e.fecha_ingreso,
           fecha_termino: e.fecha_termino,
           razon_termino: e.razon_termino,
@@ -665,7 +665,7 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
   const columns = [
     // Identificación
     { key: 'uen', label: 'UEN', render: e => e.uen || '—' },
-    { key: 'id_colaborador', label: 'ID Colab.', render: e => e.id_colaborador || '—', className: 'text-xs text-gray-400 font-mono' },
+    { key: 'ID Colaborador', label: 'ID Colab.', render: e => e['ID Colaborador'] || '—', className: 'text-xs text-gray-400 font-mono' },
     { key: 'status', label: 'Status', render: e => <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${STATUS_CLS[e.status] || 'bg-gray-100 text-gray-500'}`}>{e.status}</span> },
     { key: 'nombre_completo', label: 'Nombre completo', render: e => e.nombre_completo || '—', className: 'font-semibold whitespace-nowrap', style: { color: ACCENT } },
     { key: 'nombre', label: 'Nombre(s)', render: e => e.nombre || '—' },
@@ -684,8 +684,8 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
     // Empleo
     { key: 'fecha_ingreso', label: 'Fecha ingreso', render: e => fmtDate(e.fecha_ingreso), className: 'text-xs text-gray-500 whitespace-nowrap' },
     { key: 'departamento', label: 'Departamento', render: e => e.departamento || '—' },
-    { key: 'cargo', label: 'Cargo', render: e => e.cargo || '—', className: 'max-w-36 truncate' },
-    { key: 'tipo_contrato', label: 'Tipo contrato', render: e => e.tipo_contrato || '—' },
+    { key: 'Puesto', label: 'Cargo', render: e => e['Puesto'] || '—', className: 'max-w-36 truncate' },
+    { key: 'Tipo de contratación', label: 'Tipo contrato', render: e => e['Tipo de contratación'] || '—' },
     { key: 'jefe_directo', label: 'Jefe directo', render: e => e.jefe_directo || '—' },
     { key: 'email_corporativo', label: 'Email corporativo', render: e => e.email_corporativo || '—', className: 'font-mono text-xs', style: { color: ACCENT } },
     { key: 'email_personal', label: 'Email personal', render: e => e.email_personal || '—', className: 'font-mono text-xs' },
@@ -723,7 +723,7 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
   const filtered = empleados.filter(e => {
     const q = search.toLowerCase()
     const match = !q || [
-      e.nombre_completo, e.rfc, e.curp, e.nss, e.email_corporativo, e.id_colaborador, e.departamento, e.cargo,
+      e.nombre_completo, e.rfc, e.curp, e.nss, e.email_corporativo, e['ID Colaborador'], e.departamento, e['Puesto'],
     ].some(value => (value || '').toString().toLowerCase().includes(q))
     const st = !statusFilter || e.status === statusFilter
     return match && st
@@ -734,12 +734,12 @@ function MasterTable({ empleados, search, setSearch, statusFilter, setStatusFilt
       {
         name: 'Master',
         rows: filtered.map(e => ({
-          uen: e.uen, id_colaborador: e.id_colaborador, status: e.status,
+          uen: e.uen, 'ID Colaborador': e['ID Colaborador'], status: e.status,
           nombre_completo: e.nombre_completo, nombre: e.nombre, ap_pat: e.ap_pat, ap_mat: e.ap_mat,
           fecha_nac: e.fecha_nac, genero: e.genero, estado_civil: e.estado_civil, nacionalidad: e.nacionalidad,
           rfc: e.rfc, curp: e.curp, nss: e.nss, direccion: e.direccion, municipio: e.municipio,
-          fecha_ingreso: e.fecha_ingreso, departamento: e.departamento, cargo: e.cargo,
-          tipo_contrato: e.tipo_contrato, jefe_directo: e.jefe_directo,
+          fecha_ingreso: e.fecha_ingreso, departamento: e.departamento, 'Puesto': e['Puesto'],
+          'Tipo de contratación': e['Tipo de contratación'], jefe_directo: e.jefe_directo,
           email_corporativo: e.email_corporativo, email_personal: e.email_personal,
           fecha_termino: e.fecha_termino, razon_termino: e.razon_termino,
           antiguedad: e.antiguedad, razon_social: e.razon_social, familia_puesto: e.familia_puesto,
@@ -995,7 +995,7 @@ function OnboardingPageAdmin({ empleados, onLoad }) {
             data: {
               nombre: modal.nombre,
               email_corporativo: cfg.email_corporativo.trim().toLowerCase(),
-              cargo: modal.cargo,
+              cargo: modal['Puesto'],
               departamento: modal.departamento,
               activation_link: `https://areya-red.vercel.app/portal?token=${access.token_activacion}`,
             },
@@ -1043,12 +1043,12 @@ function OnboardingPageAdmin({ empleados, onLoad }) {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-semibold">{n.nombre_completo}</div>
-                    <div className="text-xs text-gray-400">{n.cargo} · {n.departamento}</div>
+                    <div className="text-xs text-gray-400">{n['Puesto']} · {n.departamento}</div>
                     <div className="text-xs text-gray-400 font-mono">{n.email_personal}</div>
                   </div>
                   <div className="text-xs text-gray-400 text-right mr-3">
                     <div>Ingreso: {fmtDate(n.fecha_ingreso)}</div>
-                    <div>{n.tipo_contrato}</div>
+                    <div>{n['Tipo de contratación']}</div>
                   </div>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold mr-3">Pendiente</span>
                   <button onClick={() => openModal(n)}
@@ -1073,7 +1073,7 @@ function OnboardingPageAdmin({ empleados, onLoad }) {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-semibold">{e.nombre_completo}</div>
-                    <div className="text-xs text-gray-400">{e.cargo} · {e.departamento}</div>
+                    <div className="text-xs text-gray-400">{e['Puesto']} · {e.departamento}</div>
                   </div>
                   <div className="text-xs text-gray-400 text-right">
                     <div>Ingreso: {fmtDate(e.fecha_ingreso)}</div>
@@ -1097,7 +1097,7 @@ function OnboardingPageAdmin({ empleados, onLoad }) {
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-semibold">{n.nombre_completo}</div>
-                    <div className="text-xs text-gray-400">{n.cargo} · {n.departamento}</div>
+                    <div className="text-xs text-gray-400">{n['Puesto']} · {n.departamento}</div>
                   </div>
                   <div className="text-xs font-mono" style={{ color: ACCENT }}>{n.email_corporativo || '—'}</div>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold">Configurado</span>
@@ -1121,8 +1121,8 @@ function OnboardingPageAdmin({ empleados, onLoad }) {
             <div className="px-6 py-4">
               <div className="bg-gray-50 rounded-xl p-4 mb-4 grid grid-cols-2 gap-3 text-sm">
                 {[
-                  ['Puesto', modal.cargo], ['Área', modal.departamento],
-                  ['Tipo contrato', modal.tipo_contrato], ['Fecha ingreso', fmtDate(modal.fecha_ingreso)],
+                  ['Puesto', modal['Puesto']], ['Área', modal.departamento],
+                  ['Tipo contrato', modal['Tipo de contratación']], ['Fecha ingreso', fmtDate(modal.fecha_ingreso)],
                   ['Correo personal', modal.email_personal], ['Jefe directo', modal.jefe_directo],
                 ].map(([l, v]) => (
                   <div key={l}>
@@ -1282,7 +1282,7 @@ function OffboardingPageAdmin({ entrevistas, onComplete }) {
                 </div>
                 <div className="flex-1">
                   <div className="text-sm font-semibold">{item.empleados?.nombre_completo}</div>
-                  <div className="text-xs text-gray-400">{item.empleados?.cargo} · {item.empleados?.departamento}</div>
+                  <div className="text-xs text-gray-400">{item.empleados?.['Puesto']} · {item.empleados?.departamento}</div>
                   <div className="text-xs text-gray-400">Entrevista enviada: {fmtDate(item.submitted_at?.slice(0, 10))}</div>
                 </div>
                 <div className="text-xs text-gray-500 max-w-56">{item.motivo_salida || 'Sin motivo declarado'}</div>
@@ -1992,7 +1992,7 @@ export default function Admin() {
           const PCT_FIELDS = new Set(['pct_prima','dif_pct'])
           const NUM_FIELDS = new Set(['gente_a_cargo','meses_bono','nivel_tab'])
 
-          if (hasMasterData && mappedMaster.id_colaborador) {
+          if (hasMasterData && mappedMaster['ID Colaborador']) {
             const masterPayload = Object.fromEntries(
               Object.entries(mappedMaster)
                 .filter(([, value]) => value !== '' && value != null)
@@ -2017,7 +2017,7 @@ export default function Admin() {
             const { data: ex, error: lookupError } = await supabase
               .from('empleados')
               .select('id')
-              .eq('id_colaborador', mappedMaster.id_colaborador)
+              .eq('ID Colaborador', mappedMaster['ID Colaborador'])
               .maybeSingle()
 
             if (lookupError) throw lookupError
@@ -2025,15 +2025,15 @@ export default function Admin() {
             if (ex) {
               await updateEmpleado(ex.id, masterPayload)
               updated++
-              lines.push(`✓ Master actualizado: ${mappedMaster.id_colaborador}`)
+              lines.push(`✓ Master actualizado: ${mappedMaster['ID Colaborador']}`)
             } else {
               const { error: insertError } = await supabase.from('empleados').insert(masterPayload)
               if (insertError) throw insertError
               inserted++
-              lines.push(`+ Master insertado: ${mappedMaster.id_colaborador}`)
+              lines.push(`+ Master insertado: ${mappedMaster['ID Colaborador']}`)
             }
           } else if (hasMasterData) {
-            lines.push(`⚠ Fila ${i+2}: columnas de master detectadas pero falta id_colaborador`)
+            lines.push(`⚠ Fila ${i+2}: columnas de master detectadas pero falta ID Colaborador`)
           }
 
           if (hasTabData && mappedTabulador.nivel !== '' && mappedTabulador.nivel != null) {

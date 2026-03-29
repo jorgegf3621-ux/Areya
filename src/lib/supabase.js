@@ -54,7 +54,7 @@ async function ensurePortalAccessRecord(empleadoId, nombre) {
 // EMPLEADOS
 
 export async function getEmpleados(filters = {}) {
-  let query = supabase.from('empleados').select('*').order('id_colaborador')
+  let query = supabase.from('empleados').select('*').order('ID Colaborador')
   if (filters.status) query = query.eq('status', filters.status)
   if (filters.departamento) query = query.eq('departamento', filters.departamento)
   if (filters.search) query = query.or(
@@ -78,7 +78,7 @@ export async function getEmpleadoById(id) {
 export async function upsertEmpleado(row) {
   const { data, error } = await supabase
     .from('empleados')
-    .upsert(row, { onConflict: 'id_colaborador', ignoreDuplicates: false })
+    .upsert(row, { onConflict: 'ID Colaborador', ignoreDuplicates: false })
     .select()
   if (error) throw error
   return data
@@ -95,8 +95,12 @@ export async function updateEmpleado(id, fields) {
 }
 
 export async function createEmpleadoDesdeFormulario(form) {
+  const { cargo, tipo_contrato, id_colaborador, ...rest } = form
   const payload = {
-    ...form,
+    ...rest,
+    ...(cargo !== undefined && { 'Puesto': cargo }),
+    ...(tipo_contrato !== undefined && { 'Tipo de contratación': tipo_contrato }),
+    ...(id_colaborador !== undefined && { 'ID Colaborador': id_colaborador }),
     nombre_completo: buildNombreCompleto(form),
     status: 'Pendiente',
     onboarding_configurado: false,
