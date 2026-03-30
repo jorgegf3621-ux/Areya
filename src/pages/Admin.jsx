@@ -491,6 +491,7 @@ function AttritionTab({ stats }) {
   const motivosRef = useRef(null)
   const bajasRef = useRef(null)
   const bajasDeptRef = useRef(null)
+  const bajasAnioRef = useRef(null)
 
   useEffect(() => {
     if (!stats || !motivosRef.current) return
@@ -515,11 +516,42 @@ function AttritionTab({ stats }) {
 
   useEffect(() => {
     if (!stats || !bajasDeptRef.current) return
-    const entries = Object.entries(stats.bajasDeptMap)
+    const sorted = Object.entries(stats.bajasDeptMap).sort((a, b) => b[1] - a[1])
     const c = new Chart(bajasDeptRef.current, {
       type: 'bar',
-      data: { labels: entries.map(([l]) => l), datasets: [{ data: entries.map(([,v]) => v), backgroundColor: 'rgba(239,68,68,.7)', borderRadius: 4, borderSkipped: false }] },
-      options: { ...BASE_OPTS, indexAxis: 'y' },
+      data: {
+        labels: sorted.map(([l]) => l),
+        datasets: [{ data: sorted.map(([,v]) => v), backgroundColor: 'rgba(239,68,68,.75)', borderRadius: 4, borderSkipped: false }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 9 }, color: '#9CA3AF', maxRotation: 40, minRotation: 30 } },
+          y: { grid: { color: 'rgba(0,0,0,.04)' }, ticks: { font: { size: 10 }, color: '#9CA3AF', stepSize: 1 }, beginAtZero: true },
+        },
+      },
+    })
+    return () => c.destroy()
+  }, [stats])
+
+  useEffect(() => {
+    if (!stats || !bajasAnioRef.current) return
+    const sorted = Object.entries(stats.bajasAnioMap).sort((a, b) => a[0].localeCompare(b[0]))
+    const c = new Chart(bajasAnioRef.current, {
+      type: 'bar',
+      data: {
+        labels: sorted.map(([l]) => l),
+        datasets: [{ data: sorted.map(([,v]) => v), backgroundColor: BRAND, borderRadius: 6, borderSkipped: false }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#9CA3AF' } },
+          y: { grid: { color: 'rgba(0,0,0,.04)' }, ticks: { font: { size: 10 }, color: '#9CA3AF', stepSize: 1 }, beginAtZero: true },
+        },
+      },
     })
     return () => c.destroy()
   }, [stats])
@@ -537,26 +569,32 @@ function AttritionTab({ stats }) {
 
       <div className="grid grid-cols-2 gap-4 mb-4">
         <ChartCard title="Motivos de salida"><div style={{ height: 190, position: 'relative' }}><canvas ref={motivosRef} /></div></ChartCard>
-        <ChartCard title="Bajas por mes"><div style={{ height: 190, position: 'relative' }}><canvas ref={bajasRef} /></div></ChartCard>
+        <ChartCard title="Bajas por mes (año actual)"><div style={{ height: 190, position: 'relative' }}><canvas ref={bajasRef} /></div></ChartCard>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <ChartCard title="Bajas por departamento"><div style={{ height: 180, position: 'relative' }}><canvas ref={bajasDeptRef} /></div></ChartCard>
-        <div className="bg-white rounded-xl shadow-sm p-4">
-          <div className="font-serif text-sm font-bold mb-3">Historial de bajas</div>
-          {stats.inactivos_list.length === 0
-            ? <div className="text-gray-400 text-sm text-center py-6">Sin bajas registradas</div>
-            : stats.inactivos_list.map(e => (
-              <div key={e.id} className="flex items-start justify-between py-2.5 border-b border-gray-50 last:border-0 text-sm">
-                <div>
-                  <div className="font-semibold">{e.nombre_completo}</div>
-                  <div className="text-gray-400 text-xs">{e.departamento} · {fmtDate(e.fecha_termino)}</div>
-                </div>
-                <span className="text-xs text-red-600 font-medium ml-2 flex-shrink-0">{e.razon_termino || '—'}</span>
-              </div>
-            ))
-          }
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        <ChartCard title="Bajas por año"><div style={{ height: 190, position: 'relative' }}><canvas ref={bajasAnioRef} /></div></ChartCard>
+        <div className="col-span-2">
+          <ChartCard title="Bajas por departamento"><div style={{ height: 190, position: 'relative' }}><canvas ref={bajasDeptRef} /></div></ChartCard>
         </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-sm p-4">
+        <div className="font-serif text-sm font-bold mb-3">Historial de bajas</div>
+        {stats.inactivos_list.length === 0
+          ? <div className="text-gray-400 text-sm text-center py-6">Sin bajas registradas</div>
+          : <div className="grid grid-cols-2 gap-x-6">
+              {stats.inactivos_list.map(e => (
+                <div key={e.id} className="flex items-start justify-between py-2.5 border-b border-gray-50 last:border-0 text-sm">
+                  <div>
+                    <div className="font-semibold">{e.nombre_completo}</div>
+                    <div className="text-gray-400 text-xs">{e.departamento} · {fmtDate(e.fecha_termino)}</div>
+                  </div>
+                  <span className="text-xs text-red-600 font-medium ml-2 flex-shrink-0">{e.razon_termino || '—'}</span>
+                </div>
+              ))}
+            </div>
+        }
       </div>
     </div>
   )
@@ -1722,13 +1760,19 @@ export default function Admin() {
       .forEach(e => bajasMes[new Date(e.fecha_termino).getMonth()]++)
     const isValidDept = v => v && typeof v === 'string' && !v.includes('1900') && !v.includes('1899') && v.trim() !== ''
     const bajasDeptMap = countBy(inactivos.filter(e => isValidDept(e.departamento)), 'departamento')
+    // Bajas agrupadas por año
+    const bajasAnioMap = {}
+    bajasConFecha.forEach(e => {
+      const yr = String(new Date(e.fecha_termino).getFullYear())
+      bajasAnioMap[yr] = (bajasAnioMap[yr] || 0) + 1
+    })
 
     return {
       headcount: activos.length, onboarding: onboarding.length, offboarding: offboarding.length, total,
       pctIngr2025, pctIngr2026, avgAntig, avgEdad, menos6m, mas6m,
       genPct: genPctFinal, generoMap, uenMap, deptMap, antigMap,
       costoTotal, costoAnual, promCosto, distPct,
-      bajasAnio, tasaRot, avgAntigSalida, motivoMap, bajasMes, bajasDeptMap,
+      bajasAnio, tasaRot, avgAntigSalida, motivoMap, bajasMes, bajasDeptMap, bajasAnioMap,
       activos_ob_list: activos_ob, inactivos_list: inactivos,
     }
   }, [empleados])
